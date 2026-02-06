@@ -1,0 +1,500 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Prefer Inter if available */
+  background: radial-gradient(circle at top left, #0f172a, #020617);
+  color: #e5e7eb;
+}
+
+.app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 1.5rem;
+}
+
+.app-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(90deg, #fff, #94a3b8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-header p {
+  margin: 0;
+  color: #9ca3af;
+}
+
+.app-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 1.5rem;
+}
+
+/* Glassmorphism Panels */
+.app-main-left,
+.app-main-right {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Layout Containers */
+.building-container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  max-height: calc(100vh - 180px);
+  gap: 1.5rem;
+}
+
+.floor-controls-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.floor-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  flex: 1;
+  border-bottom: 1px solid transparent;
+}
+
+/* Floor Content */
+.floor-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  width: 60px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.floor-hall-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Control Panel Grid */
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.control-row.full-width {
+  grid-column: span 2;
+}
+
+.control-row label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-row input,
+.control-row select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: white;
+  font-family: inherit;
+  width: 100%;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.control-row input:focus,
+.control-row select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.1);
+}
+
+.control-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.control-buttons-row button {
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-buttons-row button.primary {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.control-buttons-row button.primary:hover {
+  background: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+}
+
+/* Shafts Container */
+.shafts-container {
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  height: 100%;
+  position: relative;
+  /* Subtle glass borders for the container?? No, shafts are structural */
+  /* Just clearer borders */
+}
+
+.shaft {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  /* Extremely subtle shaft bg */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.shaft-floor-marker {
+  flex: 1;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.shaft-floor-marker:last-child {
+  border-bottom: none;
+}
+
+/* Elevator Car - Floating Glass Pod */
+.elevator-car {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+
+  /* Glass Pod Style applied to inner cabin */
+}
+
+.elevator-header {
+  height: 16px;
+  /* Floating header */
+  background: rgba(30, 41, 59, 0.9);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  backdrop-filter: blur(4px);
+}
+
+.elevator-id {
+  color: #f1f5f9;
+  font-weight: 700;
+}
+
+.elevator-direction {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.elevator-cabin {
+  flex: 1;
+  /* Glass Pod Body */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Interior */
+.elevator-interior {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+
+/* Door Styles */
+.elevator-door {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  /* Opaque Steel Grey */
+  background: linear-gradient(90deg, #9ca3af, #6b7280, #9ca3af);
+  border: 1px solid #4b5563;
+  transition: transform 450ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+}
+
+.door-left {
+  left: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  transform-origin: left;
+}
+
+.door-right {
+  right: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  transform-origin: right;
+}
+
+.door-left.open,
+.door-left.opening {
+  transform: translateX(-90%);
+}
+
+.door-right.open,
+.door-right.opening {
+  transform: translateX(90%);
+}
+
+.door-left.closed,
+.door-left.closing {
+  transform: translateX(0);
+}
+
+.door-right.closed,
+.door-right.closing {
+  transform: translateX(0);
+}
+
+/* Buttons - Glassmorphic */
+.hall-button,
+.car-button,
+.control-panel button {
+  border-radius: 8px;
+  /* Slightly softer */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+
+  /* Glass Default */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #e5e7eb;
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.hall-button:hover:not(:disabled),
+.car-button:hover:not(:disabled),
+.control-panel button:hover:not(:disabled) {
+  /* Hover Glow */
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+}
+
+.hall-button:active:not(:disabled),
+.car-button:active:not(:disabled) {
+  transform: translateY(0px);
+}
+
+.hall-button:disabled {
+  opacity: 0.2;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Active Hall Buttons (Lit up) */
+.hall-button.up {
+  color: #4ade80;
+}
+
+.hall-button.down {
+  color: #fb923c;
+}
+
+.hall-button.up.active {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+  color: #fff;
+  font-weight: bold;
+}
+
+.hall-button.down.active {
+  background: rgba(251, 146, 60, 0.2);
+  border-color: rgba(251, 146, 60, 0.6);
+  box-shadow: 0 0 15px rgba(251, 146, 60, 0.4);
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Car Popover Buttons */
+.car-popover-button.active {
+  /* Active / Selected Floor */
+  background: rgba(56, 189, 248, 0.6);
+  color: #fff;
+  border-color: rgba(56, 189, 248, 0.8);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+/* Sub-panels */
+.panel {
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+/* Inputs */
+.control-panel input {
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.3rem 0.6rem;
+  background: rgba(0, 0, 0, 0.2);
+  color: #e5e7eb;
+}
+
+/* Primary Button */
+.control-panel button.primary {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  border: none;
+  font-weight: 600;
+  color: white;
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+}
+
+.control-panel button.primary:hover {
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+/* Metrics */
+.metric {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Log Grid */
+.log-grid {
+  display: grid;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  /* border color essentially */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.log-cell {
+  background: rgba(15, 23, 42, 0.8);
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+}
+
+.log-header-cell {
+  background: rgba(30, 41, 59, 1);
+  color: #38bdf8;
+}
+
+/* Popover */
+.car-popover {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  z-index: 1000;
+  pointer-events: auto;
+  white-space: nowrap;
+  min-width: max-content;
+  height: fit-content;
+}
+
+@media (max-width: 900px) {
+  .app-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
