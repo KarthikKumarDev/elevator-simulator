@@ -4,7 +4,8 @@ import type {
   ElevatorState,
   OperationMode,
   Request,
-  SimulationState
+  SimulationState,
+  SystemLogEntry
 } from './types';
 
 const DEFAULT_CONFIG: BuildingConfig = {
@@ -51,6 +52,7 @@ export function createInitialState(
       totalRequests: 0
     },
     travelLog,
+    systemLogs: [],
     running: false
   };
 }
@@ -65,7 +67,20 @@ export function addRequest(
     createdAtTick: state.clockTick
   };
 
-  return { ...state, pendingRequests: [...state.pendingRequests, newRequest] };
+  const log: SystemLogEntry = {
+    id: `${Date.now()}-${Math.random()}`,
+    tick: state.clockTick,
+    type: 'request',
+    summary: `New ${request.type} request at Floor ${request.floor} ${request.direction || ''}`,
+    details: newRequest,
+    timestamp: new Date().toISOString()
+  };
+
+  return {
+    ...state,
+    pendingRequests: [...state.pendingRequests, newRequest],
+    systemLogs: [log, ...state.systemLogs].slice(0, 500) // Keep latest 500
+  };
 }
 
 export function toggleCarRequest(
@@ -317,7 +332,10 @@ function stepElevator(
     return addStats({
       ...elevator,
       targetFloors: restTargets,
-      direction: updateElevatorDirection({ ...elevator, targetFloors: restTargets }),
+      // Fixed: Do NOT update direction here. 
+      // Retain the arrival direction so we can satisfy requests compatible with it.
+      // Direction will naturally update when we start moving to the next target.
+      // direction: updateElevatorDirection({ ...elevator, targetFloors: restTargets }),
       doorState: 'opening'
     }, 1, costs.door);
   }
@@ -373,17 +391,7 @@ export function tickSimulation(
       // If elevator is at the floor, and direction is incompatible, DO NOT add to targetFloors.
       // This allows the elevator to leave.
       // It will re-add this floor to targets once it leaves (currentFloor != req.floor).
-      const isAtFloor = elev.currentFloor === req.floor;
-      const isCompatible =
-        !req.direction ||
-        elev.direction === 'idle' ||
-        elev.direction === req.direction;
-
-      if (isAtFloor && !isCompatible) {
-        // Do not add to targets
-      } else {
-        elev.targetFloors.push(req.floor);
-      }
+      elev.targetFloors.push(req.floor);
       nextActive.push(req);
     } else {
       // Orphaned request? Should not happen.
@@ -416,20 +424,73 @@ export function tickSimulation(
     nextActive.push({ ...req, assignedElevatorId: elev.id });
   }
 
-  // Sort Targets and Update Direction
+  // Sort Targets and Update Direction (LOOK Algorithm)
   elevators.forEach(e => {
-    e.targetFloors = Array.from(new Set(e.targetFloors)).sort((a, b) => {
-      if (e.direction === 'down') return b - a;
-      return a - b;
-    });
-    // Important: Update direction based on new targets? 
-    // stepElevator does this. But we need stable direction for compatibility checks next tick.
-    // e.direction = updateElevatorDirection(e); 
-    // Actually `updateElevatorDirection` relies on `targetFloors`.
-    // If we don't update direction here, `chooseElevatorForRequest` uses stale direction?
-    // `tickSimulation` doesn't strictly update direction until `stepElevator`. 
-    // But we just modified `targetFloors`. 
-    // Let's leave direction update to `stepElevator` to avoid jumpiness.
+    // Remove duplicates
+    let targets = Array.from(new Set(e.targetFloors));
+
+    if (targets.length === 0) return;
+
+    const current = e.currentFloor;
+    const direction = e.direction;
+
+    // Filter targets into "ahead" (in current direction) and "behind" (requires reverse)
+    let ahead: number[] = [];
+    let behind: number[] = [];
+
+    if (direction === 'up') {
+      ahead = targets.filter(t => t >= current).sort((a, b) => a - b);
+      behind = targets.filter(t => t < current).sort((a, b) => b - a);
+    } else if (direction === 'down') {
+      ahead = targets.filter(t => t <= current).sort((a, b) => b - a);
+      behind = targets.filter(t => t > current).sort((a, b) => a - b);
+    } else {
+      targets.sort((a, b) => Math.abs(current - a) - Math.abs(current - b));
+      ahead = targets;
+    }
+
+    // Reconstruct target list
+    e.targetFloors = [...ahead, ...behind];
+
+    // PEEK CHECK:
+    // Only perform this check if we are "Passing Through" (continuing in same direction).
+    // If we are reversing (Turnaround), we generally MUST stop to service the terminal request.
+    // e.g. Arriving Down at 3, next target > 3 (Up). We stop at 3 to serve Down, then flip.
+    if (e.targetFloors.length > 0 && e.targetFloors[0] === current) {
+      const nextStop = e.targetFloors.length > 1 ? e.targetFloors[1] : undefined;
+
+      // Predict direction after stop
+      let nextDir: Direction = 'idle';
+      if (nextStop !== undefined) {
+        if (nextStop > current) nextDir = 'up';
+        else if (nextStop < current) nextDir = 'down';
+      }
+
+      // If we are Turning Around (nextDir !== direction), we SKIP the peek check.
+      // We assume we must stop to service the request that ends our current run.
+      // Exception: If nextDir is idle, we treat as passing through (or end of line).
+      if (nextDir !== 'idle' && nextDir !== direction) {
+        // Turnaround: Allow stop.
+      } else {
+        // Passing Through or End of Line: Verify compatibility.
+        // Find if there is ANY compatible request for this floor
+        const hasCompatibleRequest = nextActive.some(req =>
+          req.floor === current &&
+          req.assignedElevatorId === e.id &&
+          (
+            !req.direction || // Car call
+            nextDir === 'idle' ||
+            nextDir === req.direction
+          )
+        );
+
+        if (!hasCompatibleRequest) {
+          // No compatible request for the direction we are about to leave in.
+          // Skip this stop.
+          e.targetFloors.shift();
+        }
+      }
+    }
   });
 
   // MOVEMENT PHASE
@@ -477,9 +538,36 @@ export function tickSimulation(
       const isCompatible =
         !req.direction ||
         servingElevator.direction === 'idle' ||
-        servingElevator.direction === req.direction;
+        servingElevator.direction === req.direction ||
+        // Fix for Door Loop at Terminal Floors:
+        // If this is the LAST target (or only target), we effectively treat it as compatible
+        // because the elevator will become Idle or flip direction after this.
+        // We check targetFloors length. Since we are IN the target floor, it should be in the list (or just removed).
+        // Actually, stepElevator removes the target when it arrives? No, stepElevator removes it when it opens doors.
+        // But here we are in 'open' state. So targetFloors should NOT contain the current floor anymore?
+        // Let's check stepElevator. 
+        // Yes: `const [, ...restTargets] = elevator.targetFloors;` -> removes it.
+        // So if we are at the floor and open, `targetFloors` should be empty (if that was the only one) 
+        // OR start with the NEXT target.
+        servingElevator.targetFloors.length === 0 ||
+        (servingElevator.targetFloors.length > 0 && servingElevator.targetFloors[0] !== req.floor);
+      // Wait, if we have further targets, we should only be compatible if direction matches.
+      // But if we are at the terminal floor, we usually don't have further targets in the *current* direction.
+      // If targetFloors is empty, we are compatible (End of Run).
 
-      if (isCompatible) {
+      // Refined Logic for Terminal/Turnaround Completion:
+      // We check if we are at the "End of Run" in the current direction.
+      // If we are UP, and have no targets > current, we are at the end.
+      // If we are DOWN, and have no targets < current, we are at the end.
+      const hasStrictlyHigherTargets = servingElevator.targetFloors.some(f => f > servingElevator.currentFloor);
+      const hasStrictlyLowerTargets = servingElevator.targetFloors.some(f => f < servingElevator.currentFloor);
+
+      let isEndOfRun = false;
+      if (servingElevator.direction === 'up' && !hasStrictlyHigherTargets) isEndOfRun = true;
+      else if (servingElevator.direction === 'down' && !hasStrictlyLowerTargets) isEndOfRun = true;
+      else if (servingElevator.direction === 'idle') isEndOfRun = true;
+
+      if (isCompatible || isEndOfRun) {
         // When serving a hall request, pin the visible direction to the
         // request's direction (up/down) while at the destination floor.
         if (req.direction) {
@@ -508,6 +596,53 @@ export function tickSimulation(
 
   const avgWaitTime = totalRequests === 0 ? 0 : totalWaitTime / totalRequests;
 
+  // SYSTEM LOGGING: Detect changes for Movement and Doors
+  let newLogs: SystemLogEntry[] = [...state.systemLogs];
+
+  updatedElevators.forEach((elev, idx) => {
+    const prev = prevElevators[idx];
+    if (!prev) return;
+
+    // 1. Movement Log
+    if (elev.currentFloor !== prev.currentFloor) {
+      newLogs.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: clockTick,
+        type: 'movement',
+        summary: `Elevator ${elev.id} moved to Floor ${elev.currentFloor}`,
+        details: { from: prev.currentFloor, to: elev.currentFloor, direction: elev.direction },
+        timestamp: new Date().toISOString()
+      });
+    } else if (elev.currentFloor === prev.currentFloor && elev.direction === 'idle' && prev.direction !== 'idle') {
+      // Stopped?
+      newLogs.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: clockTick,
+        type: 'movement',
+        summary: `Elevator ${elev.id} stopped at Floor ${elev.currentFloor}`,
+        details: { floor: elev.currentFloor },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 2. Door Log
+    if (elev.doorState !== prev.doorState) {
+      newLogs.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: clockTick,
+        type: 'door',
+        summary: `Elevator ${elev.id} doors are ${elev.doorState}`,
+        details: { from: prev.doorState, to: elev.doorState, floor: elev.currentFloor },
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Cap logs at 500
+  if (newLogs.length > 500) {
+    newLogs = newLogs.slice(0, 500);
+  }
+
   return {
     ...state,
     clockTick,
@@ -520,7 +655,8 @@ export function tickSimulation(
       avgWaitTime,
       maxWaitTime,
       totalRequests
-    }
+    },
+    systemLogs: newLogs
   };
 }
 

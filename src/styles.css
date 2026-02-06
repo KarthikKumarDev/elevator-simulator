@@ -438,11 +438,37 @@ body {
 }
 
 /* Metrics */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
 .metric {
-  padding: 0.5rem;
+  padding: 0.6rem;
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.3rem;
+}
+
+.metric-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #38bdf8;
+  line-height: 1;
 }
 
 /* Log Grid */

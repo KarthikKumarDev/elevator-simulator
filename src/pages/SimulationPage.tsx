@@ -6,6 +6,7 @@ import { BuildingView } from '../components/BuildingView';
 import { ControlPanel } from '../components/ControlPanel';
 import { MetricsPanel } from '../components/MetricsPanel';
 import { TravelLogPanel } from '../components/TravelLogPanel';
+import { DebugModal } from '../components/DebugModal';
 
 // Default Config reused here
 const DEFAULT_CONFIG: BuildingConfig = {
@@ -23,6 +24,7 @@ export function SimulationPage() {
         createInitialState(DEFAULT_CONFIG)
     );
     const [carPanelElevatorId, setCarPanelElevatorId] = useState<string | null>(null);
+    const [isDebugOpen, setIsDebugOpen] = useState(false);
 
     const maxFloor = useMemo(() => config.floors, [config.floors]);
 
@@ -105,6 +107,22 @@ export function SimulationPage() {
                     zIndex: 10
                 }}>
                     <button
+                        className="debug-btn"
+                        onClick={() => setIsDebugOpen(true)}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            background: 'rgba(234, 179, 8, 0.1)', // Yellow tint
+                            border: '1px solid rgba(234, 179, 8, 0.3)',
+                            color: '#EAB308',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(5px)',
+                            marginRight: '0.5rem'
+                        }}
+                    >
+                        Debug
+                    </button>
+                    <button
                         className="tests-btn"
                         onClick={() => navigate('/tests')}
                         style={{
@@ -167,6 +185,12 @@ export function SimulationPage() {
                     />
                 </section>
             </main>
+
+            <DebugModal
+                isOpen={isDebugOpen}
+                onClose={() => setIsDebugOpen(false)}
+                logs={state.systemLogs}
+            />
         </div>
     );
 }

@@ -47,6 +47,15 @@ export interface Metrics {
   totalRequests: number;
 }
 
+export interface SystemLogEntry {
+  id: string; // Unique ID for keying
+  tick: number;
+  type: 'request' | 'movement' | 'door';
+  summary: string;
+  details: any;
+  timestamp: string; // ISO Time
+}
+
 export interface SimulationState {
   clockTick: number;
   elevators: ElevatorState[];
@@ -56,6 +65,7 @@ export interface SimulationState {
   metrics: Metrics;
   // For each elevator, the chronological sequence of floors it has visited.
   travelLog: Record<string, number[]>;
+  systemLogs: SystemLogEntry[];
   running: boolean;
 }
 
