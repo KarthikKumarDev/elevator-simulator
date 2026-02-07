@@ -101,3 +101,35 @@ This document defines specific, automated test scenarios to be implemented using
 - **TC.PERF.01**: Render Performance - Ensure 60fps animations during heavy movement.
 - **TC.PERF.02**: Memory Leak Check - Run simulation for 10 minutes and check for heap growth (manual/profile).
 
+## 4. General Testing Strategy Overview
+
+This section outlines the high-level approach to testing the application.
+
+### Unit Tests
+- **Simulation logic**:
+    - Tick progression moves elevators correctly.
+    - Doors open/close with correct timing.
+- **Request handling**:
+    - New requests are queued and eventually served.
+    - Multiple requests on same floor handled properly.
+- **Algorithms**:
+    - Correct elevator selected for given scenarios.
+    - Queue ordering in elevator is as expected.
+
+### Integration Tests
+- **Engine + State**
+    - Run multiple ticks and verify expected final state.
+    - Simulate a sequence of events (e.g., several calls) and check results.
+- **Engine + UI**
+    - Given user clicks, verify visual state matches expected simulation state.
+
+### UI Tests
+- Rendering of floors and elevators.
+- Control buttons (start/pause/reset) behavior.
+- Input validation (e.g., invalid floor number config).
+
+### Manual / Exploratory Testing
+- Try different configurations and stress conditions.
+- Observe behavior when rapidly spamming calls.
+- Validate that metrics appear reasonable and consistent with expectations.
+

@@ -33,3 +33,27 @@
 - **FR22**: Door Open Duration customization (in ticks) from the control panel.
 - **FR23**: "Hold Open" behavior on hover (doors do not close if mouse is over elevator).
 - **FR24**: Detailed per-elevator Travel Log, including moving time, power consumption, and floor sequence.
+
+## 6. Goals and Scope
+- **Primary goal**: Build an interactive, UI-based elevator simulator that visualizes elevator movement, handles user requests realistically, and allows testing of different control algorithms.
+- **Scope**:
+  - Multiple floors (configurable).
+  - One or more elevators (configurable).
+  - Basic request handling (internal car buttons, external hall calls).
+  - Visualization of elevator position, direction, doors, and queues, with clear vertical separation between floors.
+  - Basic metrics (e.g., wait time, travel time) for evaluation.
+
+## 7. Non-Functional Requirements
+- **NFR1**: UI should update smoothly at simulation tick intervals (no major jank).
+- **NFR2**: Code should be modular: clear separation of UI, simulation engine, and state management.
+- **NFR3**: Easy to extend with new algorithms or additional metrics.
+- **NFR4**: Basic responsiveness for common desktop resolutions; optional mobile support.
+
+## 8. Future Extensions
+- Advanced cost-based scheduling (e.g., considering future demand).
+- Group control with load balancing.
+- Priority requests (VIP, emergency).
+- Passenger modeling (capacity, boarding/alighting times, crowds).
+- Advanced analytics (per-floor wait times, heatmaps).
+- Saving/loading simulation scenarios.
+- AI/ML-based scheduling experiments.

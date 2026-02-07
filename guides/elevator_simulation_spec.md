@@ -71,4 +71,32 @@ A request is marked as **Completed** when:
 A request is marked **Completed** only when:
 1.  Elevator is at the floor.
 2.  Doors are `Open`.
-3.  Direction is **Compatible** (e.g., Elevator going Up can serve Up calls and Drop-offs, but not Down calls).
+
+## 5. Operation Modes - Detailed Behavior
+
+### 1. Eco Mode (Energy Saver)
+- **Goal**: Absolute minimization of power consumption.
+- **Movement**: **Half Speed**. Elevators have a 50% probability to wait (skip a tick) during movement, simulating slower, energy-efficient motors.
+- **Dispatching**: **Strict Idle Preservation**.
+    - The system will **NEVER** wake up a stationary (Idle) elevator if there is *any* currently moving (Active) elevator in the building, regardless of distance.
+    - New requests must wait for the active elevator to become free or compatible.
+    - Idle elevators are only utilized if the entire system is stationary.
+- **Conflict Handling**: Simultaneous UP/DOWN requests at the same floor are handled sequentially by the same active elevator to avoid activating a second car.
+
+### 2. Normal Mode (Balanced)
+- **Goal**: Balance between passenger wait times and system efficiency.
+- **Movement**: **Standard Speed**. Elevators move 1 floor per simulation tick.
+- **Dispatching**: **Collective Control**.
+    - Assigns requests to the elevator with the lowest "Cost" (Distance + Compatibility).
+    - Passing elevators will pick up passengers (Piggybacking).
+    - Idle elevators will be awakened if they are the closest or best option.
+- **Conflict Handling**: Standard behavior. If one elevator serves UP, a second elevator *may* serve DOWN if it is nearby and available, but the system does not force spread.
+
+### 3. Power Mode (Turbo / High Performance)
+- **Goal**: Minimize Passenger Wait Times.
+- **Movement**: **Double Speed**. Elevators skip floors (moving 2 floors per tick) when traveling distances of 2 or more, simulating high-speed express travel.
+- **Dispatching**: **Aggressive Availability**.
+    - Standard cost-based assignment but with the hardware advantage of speed.
+- **Conflict Handling**: **Maximum Throughput**.
+    - Due to standard dispatching logic combined with high speed, availability is cycled quickly.
+    - Like Normal mode, conflicting requests will trigger a second elevator if the closest one is incompatible (busy going the other way), ensuring both passengers move as soon as possible.
