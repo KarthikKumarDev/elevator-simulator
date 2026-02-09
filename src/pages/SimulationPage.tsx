@@ -28,13 +28,25 @@ export function SimulationPage() {
 
     const maxFloor = useMemo(() => config.floors, [config.floors]);
 
+    // Use ref to store latest config so interval callback can access it
+    const configRef = useRef(config);
+    configRef.current = config;
+
+    // Track running state in ref to avoid recreating interval
+    const runningRef = useRef(state.running);
+    runningRef.current = state.running;
+
     useEffect(() => {
-        if (!state.running) return;
         const id = setInterval(() => {
-            setState((prev) => tickSimulation(prev, config));
+            if (!runningRef.current) {
+                return; // Skip if not running
+            }
+
+            setState((prev) => tickSimulation(prev, configRef.current));
         }, config.tickDurationMs);
+
         return () => clearInterval(id);
-    }, [state.running, config.tickDurationMs]);
+    }, [config.tickDurationMs]); // Only recreate if tick duration changes
 
     const handleStart = () => {
         setState((prev) => ({ ...prev, running: true }));

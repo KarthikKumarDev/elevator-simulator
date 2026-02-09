@@ -16,15 +16,19 @@ const DEFAULT_CONFIG: BuildingConfig = {
   mode: 'normal'
 };
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 export function createInitialState(
   config: BuildingConfig = DEFAULT_CONFIG
 ): SimulationState {
   const elevators: ElevatorState[] = Array.from({ length: config.elevators }, (_, i) => ({
     id: `E${i + 1}`,
     currentFloor: 1,
-    direction: 'idle',
-    lastDirection: 'idle',
-    doorState: 'closed',
+    direction: 'idle' as Direction,
+    lastDirection: 'idle' as Direction,
+    doorState: 'closed' as const,
     doorOpenTicksRemaining: 0,
     isHovered: false,
     targetFloors: [],
@@ -36,7 +40,6 @@ export function createInitialState(
 
   const travelLog: Record<string, number[]> = {};
   for (const elevator of elevators) {
-    // Start each elevator log at its initial floor.
     travelLog[elevator.id] = [elevator.currentFloor];
   }
 
@@ -56,6 +59,10 @@ export function createInitialState(
     running: false
   };
 }
+
+// ============================================================================
+// REQUEST MANAGEMENT
+// ============================================================================
 
 export function addRequest(
   state: SimulationState,
@@ -79,7 +86,7 @@ export function addRequest(
   return {
     ...state,
     pendingRequests: [...state.pendingRequests, newRequest],
-    systemLogs: [log, ...state.systemLogs].slice(0, 500) // Keep latest 500
+    systemLogs: [log, ...state.systemLogs].slice(0, 500)
   };
 }
 
@@ -102,31 +109,31 @@ export function toggleCarRequest(
           targetFloors: e.targetFloors.filter((f) => f !== floor)
         };
       }),
-      // Remove associated active/pending requests to prevent zombie requests
       activeRequests: state.activeRequests.filter(
-        (req) =>
-          !(
-            req.assignedElevatorId === elevatorId &&
-            req.floor === floor &&
-            req.type === 'car'
-          )
-      ),
-      pendingRequests: state.pendingRequests.filter(
-        (req) =>
-          !(
-            req.assignedElevatorId === elevatorId &&
-            req.floor === floor &&
-            req.type === 'car'
-          )
+        (r) => !(r.assignedElevatorId === elevatorId && r.floor === floor && r.type === 'car')
       )
     };
   } else {
-    // Add if not selected
-    return addRequest(state, {
+    // Add new car request
+    const carRequest: Request = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       type: 'car',
       floor,
+      createdAtTick: state.clockTick,
       assignedElevatorId: elevatorId
-    });
+    };
+
+    return {
+      ...state,
+      activeRequests: [...state.activeRequests, carRequest],
+      elevators: state.elevators.map((e) => {
+        if (e.id !== elevatorId) return e;
+        return {
+          ...e,
+          targetFloors: [...e.targetFloors, floor]
+        };
+      })
+    };
   }
 }
 
@@ -143,520 +150,582 @@ export function setElevatorHover(
   };
 }
 
-function chooseElevatorForRequest(
-  elevators: ElevatorState[],
+// ============================================================================
+// COST FUNCTION & DISPATCHING
+// ============================================================================
+
+/**
+ * Calculate the cost of assigning a request to an elevator.
+ * Lower cost = better match.
+ */
+function calculateCost(
+  elevator: ElevatorState,
   request: Request,
   mode: OperationMode
-): ElevatorState | undefined {
-  let best: { elevator: ElevatorState; cost: number } | undefined;
+): number {
+  const distance = Math.abs(elevator.currentFloor - request.floor);
 
-  for (const elevator of elevators) {
-    // Cost starts with distance
-    const distance = Math.abs(elevator.currentFloor - request.floor);
-    let cost = distance;
+  // Car calls have no direction, always compatible
+  if (request.type === 'car') {
+    return distance;
+  }
 
-    // Check availability/compatibility
-    const isIdle = elevator.direction === 'idle';
-    const isMovingTowards =
-      (elevator.direction === 'up' && request.floor >= elevator.currentFloor) ||
-      (elevator.direction === 'down' && request.floor <= elevator.currentFloor);
+  // Hall calls require direction compatibility check
+  const isCompatible = isElevatorCompatible(elevator, request);
 
-    // For Hall calls, direction must match. For Car calls, just getting there is enough (piggyback).
-    // Usually car calls have no direction, but here request.direction is set for hall calls.
-    const directionMatch =
-      !request.direction || // Car call or indiscriminate
-      elevator.direction === request.direction;
+  let cost = distance;
 
-    // Compatibility check for Eco (Collective Control)
-    // We can only assign to a busy elevator if it's moving towards the floor AND directions allow.
-    const isCompatible = !isIdle && isMovingTowards && directionMatch;
-
-    if (mode === 'eco') {
-      // Eco Logic: Strongly prefer Compatible Active elevators.
-      // Penalize Idle elevators to encourage using the active one.
-
-      if (isCompatible) {
-        cost -= 50; // Huge bonus for piggybacking
-      } else if (isIdle) {
-        cost += 0; // Baseline
-      } else {
-        // Busy but Incompatible (wrong way or passed already) -> Do not select essentially.
-        // We add a massive penalty or skip.
-        // If we strictly filter candidates in tickSimulation, this might be redundant, 
-        // but robust scoring handles it.
-        cost += 1000;
-      }
+  if (mode === 'eco') {
+    if (elevator.direction === 'idle') {
+      cost += 0; // Baseline for idle
+    } else if (isCompatible) {
+      cost -= 50; // Strong preference for piggybacking
     } else {
-      // Normal/Power Logic (Baseline)
-      // Original logic used directionScore. Let's map roughly to that.
-      // -1 for compatible, +1 for incompatible, 0 for idle.
-      // Distance is main factor.
-
-      if (isIdle) {
-        cost += 0;
-      } else if (isCompatible) {
-        cost -= 1; // Slight preference for flow
-      } else {
-        cost += 1000; // Prefer not to interrupt/confuse logic if not compatible
-      }
+      cost += 1000; // Strong avoidance
     }
-
-    if (!best || cost < best.cost) {
-      best = { elevator, cost };
+  } else {
+    // Normal and Power modes use same cost logic
+    if (isCompatible) {
+      cost -= 1; // Slight preference
+    } else {
+      cost += 1000; // Strong avoidance
     }
   }
 
-  // Eco Constraint: If we found an Idle elevator as 'best', but there are Active elevators 
-  // running (even if incompatible right now), we prefer to WAIT (return undefined) 
-  // rather than waking the idle one.
-  if (mode === 'eco' && best && best.elevator.direction === 'idle') {
-    const hasAnyActive = elevators.some(
-      (e) => e.direction !== 'idle' || e.targetFloors.length > 0
-    );
-    if (hasAnyActive) {
-      // We have active elevators, but the best candidate was Idle (meaning no compatible active found).
-      // We choose to wait.
-      return undefined;
-    }
-  }
-
-  // If best cost is 1000+ (incompatible), implies no suitable candidate found 
-  // (e.g. all busy going wrong way, no idle).
-  if (best && best.cost >= 1000) {
-    return undefined;
-  }
-
-  return best?.elevator;
+  return cost;
 }
 
-export function updateElevatorDirection(elevator: ElevatorState): Direction {
-  if (elevator.targetFloors.length === 0) {
-    return 'idle';
+/**
+ * Check if an elevator is compatible with a hall request.
+ * Compatible means: Idle, OR moving toward request with matching direction.
+ */
+function isElevatorCompatible(elevator: ElevatorState, request: Request): boolean {
+  if (elevator.direction === 'idle') return true;
+  if (!request.direction) return true; // Car calls are always compatible
+
+  const isMovingToward =
+    (elevator.direction === 'up' && request.floor >= elevator.currentFloor) ||
+    (elevator.direction === 'down' && request.floor <= elevator.currentFloor);
+
+  const directionMatches = elevator.direction === request.direction;
+
+  return isMovingToward && directionMatches;
+}
+
+/**
+ * Assign pending requests to elevators based on cost function.
+ */
+function dispatchRequests(
+  state: SimulationState,
+  config: BuildingConfig
+): SimulationState {
+  let elevators = [...state.elevators];
+  let pendingRequests = [...state.pendingRequests];
+  let activeRequests = [...state.activeRequests];
+
+  // Process each pending request
+  for (let i = pendingRequests.length - 1; i >= 0; i--) {
+    const request = pendingRequests[i];
+
+    // Skip if already assigned
+    if (request.assignedElevatorId) continue;
+
+    // Find best elevator
+    let bestElevator: ElevatorState | null = null;
+    let bestCost = Infinity;
+
+    for (const elevator of elevators) {
+      const cost = calculateCost(elevator, request, config.mode);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestElevator = elevator;
+      }
+    }
+
+    // Eco mode: Idle preservation - don't wake idle if any elevator is active
+    if (config.mode === 'eco' && bestElevator?.direction === 'idle') {
+      const hasActiveElevator = elevators.some(e => e.direction !== 'idle');
+      if (hasActiveElevator) {
+        continue; // Defer assignment
+      }
+    }
+
+    // Assign request
+    if (bestElevator) {
+
+      // Create new request object instead of mutating (React Strict Mode runs this twice)
+      const assignedRequest = {
+        ...request,
+        assignedElevatorId: bestElevator.id
+      };
+
+      activeRequests.push(assignedRequest);
+      pendingRequests.splice(i, 1);
+
+      // Add to target floors
+      elevators = elevators.map(e => {
+        if (e.id === bestElevator!.id) {
+          const updated = {
+            ...e,
+            targetFloors: [...e.targetFloors, assignedRequest.floor]
+          };
+          return updated;
+        }
+        return e;
+      });
+    }
   }
 
-  const nextTarget = elevator.targetFloors[0];
-  if (nextTarget > elevator.currentFloor) return 'up';
-  if (nextTarget < elevator.currentFloor) return 'down';
+  return {
+    ...state,
+    elevators,
+    pendingRequests,
+    activeRequests
+  };
+}
+
+// ============================================================================
+// LOOK ALGORITHM - TARGET SCHEDULING
+// ============================================================================
+
+/**
+ * Sort target floors using LOOK algorithm.
+ * Continues in current direction until no more targets ahead, then reverses.
+ */
+function sortTargetFloors(
+  currentFloor: number,
+  direction: Direction,
+  targets: number[]
+): number[] {
+  if (targets.length === 0) return [];
+
+  // Remove duplicates
+  const uniqueTargets = Array.from(new Set(targets));
+
+  // If idle, just sort ascending
+  if (direction === 'idle') {
+    return uniqueTargets.sort((a, b) => Math.abs(a - currentFloor) - Math.abs(b - currentFloor));
+  }
+
+  // Partition into ahead and behind
+  const ahead: number[] = [];
+  const behind: number[] = [];
+
+  for (const target of uniqueTargets) {
+    if (direction === 'up') {
+      if (target >= currentFloor) {
+        ahead.push(target);
+      } else {
+        behind.push(target);
+      }
+    } else {
+      // direction === 'down'
+      if (target <= currentFloor) {
+        ahead.push(target);
+      } else {
+        behind.push(target);
+      }
+    }
+  }
+
+  // Sort ahead in travel direction, behind in reverse
+  if (direction === 'up') {
+    ahead.sort((a, b) => a - b); // Ascending
+    behind.sort((a, b) => b - a); // Descending for return trip
+  } else {
+    ahead.sort((a, b) => b - a); // Descending
+    behind.sort((a, b) => a - b); // Ascending for return trip
+  }
+
+  return [...ahead, ...behind];
+}
+
+/**
+ * Determine the next direction based on current position and targets.
+ */
+function determineNextDirection(
+  currentFloor: number,
+  currentDirection: Direction,
+  sortedTargets: number[]
+): Direction {
+  if (sortedTargets.length === 0) return 'idle';
+
+  const nextTarget = sortedTargets[0];
+
+  if (nextTarget > currentFloor) return 'up';
+  if (nextTarget < currentFloor) return 'down';
+
+  // At target floor - maintain current direction if more targets ahead
+  if (currentDirection === 'up' && sortedTargets.some(t => t > currentFloor)) return 'up';
+  if (currentDirection === 'down' && sortedTargets.some(t => t < currentFloor)) return 'down';
+
   return 'idle';
 }
 
-// ... move updateElevatorDirection ...
+// ============================================================================
+// MOVEMENT PHYSICS
+// ============================================================================
 
-function stepElevator(
+/**
+ * Move elevator toward next target based on operation mode.
+ */
+function moveElevator(
   elevator: ElevatorState,
   config: BuildingConfig
 ): ElevatorState {
-  // Power Constants
-  const POWER_COSTS = {
-    eco: { move: 1, door: 0.5, idle: 0 },
-    normal: { move: 2, door: 1, idle: 0 },
-    power: { move: 5, door: 2, idle: 0 }
-  };
-  const costs = POWER_COSTS[config.mode];
-
-  // Helper to accumulate stats
-  const addStats = (e: ElevatorState, time: number, power: number): ElevatorState => ({
-    ...e,
-    stats: {
-      totalTravelTime: e.stats.totalTravelTime + time,
-      powerConsumed: e.stats.powerConsumed + power
-    }
-  });
-
-  if (elevator.doorState === 'opening') {
-    return addStats({
-      ...elevator,
-      doorState: 'open',
-      doorOpenTicksRemaining: config.doorOpenTicks
-    }, 1, costs.door);
-  }
-  if (elevator.doorState === 'open') {
-    // If hovered, don't decrement tickets regarding door closure, effectually keeping it open
-    if (elevator.isHovered) {
-      // Idle while held open? Low cost or door cost? Let's say idle cost.
-      return addStats(elevator, 1, costs.idle);
-    }
-    if (elevator.doorOpenTicksRemaining > 1) {
-      return addStats({
-        ...elevator,
-        doorOpenTicksRemaining: elevator.doorOpenTicksRemaining - 1
-      }, 1, costs.idle);
-    }
-    return addStats({ ...elevator, doorState: 'closing', doorOpenTicksRemaining: 0 }, 1, costs.door);
-  }
-  if (elevator.doorState === 'closing') {
-    return addStats({ ...elevator, doorState: 'closed' }, 1, costs.door);
-  }
-
   if (elevator.targetFloors.length === 0) {
-    // Idle
-    return addStats({ ...elevator, direction: 'idle' }, 0, costs.idle);
+    return { ...elevator, direction: 'idle' };
   }
 
-  // Operation Mode Logic: Speed/Movement Modification
-  // Eco: Move every 2nd tick (simulate by checking clock or keeping internal sub-tick state?
-  // Use a random check or simple modulus simulation for now.
-  // Actually, we can just skip movement 50% of the time, or better:
-  // If Eco mode, only move if simulation tick is even? We don't have global tick passed here easily
-  // without changing signature again. But we can assume typical tick-based.
-  // Alternative: "Eco" just means moves slower.
-  // "Power": Moves 2 floors at once if distance > 1?
+  // Sort targets
+  const sortedTargets = sortTargetFloors(
+    elevator.currentFloor,
+    elevator.direction,
+    elevator.targetFloors
+  );
 
+  if (sortedTargets.length === 0) {
+    return { ...elevator, direction: 'idle', targetFloors: [] };
+  }
+
+  const nextTarget = sortedTargets[0];
+
+  // Already at target - don't move
+  if (elevator.currentFloor === nextTarget) {
+    return elevator;
+  }
+
+  // Determine movement direction
+  const moveDirection: Direction = nextTarget > elevator.currentFloor ? 'up' : 'down';
+
+  // Calculate movement distance based on mode
   let floorsToMove = 1;
-  const isPower = config.mode === 'power';
-  const isEco = config.mode === 'eco';
 
-  // Eco: 50% chance to skip movement tick (effective 50% speed)
-  if (isEco && Math.random() > 0.5) {
-    // Waiting for eco tick
-    return addStats(elevator, 1, costs.idle);
-  }
-
-  // Power: Accelerate! If distance >= 2, move 2 floors.
-  const nextTarget = elevator.targetFloors[0];
-  if (isPower) {
-    const dist = Math.abs(elevator.currentFloor - nextTarget);
-    if (dist >= 2) {
-      floorsToMove = 2;
+  if (config.mode === 'power') {
+    const distance = Math.abs(nextTarget - elevator.currentFloor);
+    if (distance > 1) {
+      floorsToMove = 2; // Turbo speed
+    }
+  } else if (config.mode === 'eco') {
+    // 50% chance to skip movement (half speed)
+    if (Math.random() < 0.5) {
+      floorsToMove = 0;
     }
   }
 
-  if (elevator.currentFloor === nextTarget) {
-    const [, ...restTargets] = elevator.targetFloors;
-    // Power/Normal: Fast door opening?
-    // Let's just standard open.
-    // Transitioning to opening takes a tick? No, we return state 'opening' immediately for NEXT tick to process?
-    // stepElevator returns the state for the current tick.
-    // If we return doorState: 'opening', we consumed this tick to make that decision/transition.
-    // So we charge cost.
-    return addStats({
-      ...elevator,
-      targetFloors: restTargets,
-      // Fixed: Do NOT update direction here. 
-      // Retain the arrival direction so we can satisfy requests compatible with it.
-      // Direction will naturally update when we start moving to the next target.
-      // direction: updateElevatorDirection({ ...elevator, targetFloors: restTargets }),
-      doorState: 'opening'
-    }, 1, costs.door);
+  // Move elevator
+  let newFloor = elevator.currentFloor;
+  if (floorsToMove > 0) {
+    if (moveDirection === 'up') {
+      newFloor = Math.min(elevator.currentFloor + floorsToMove, nextTarget, config.floors);
+    } else {
+      newFloor = Math.max(elevator.currentFloor - floorsToMove, nextTarget, 1);
+    }
   }
 
-  const direction: Direction = nextTarget > elevator.currentFloor ? 'up' : 'down';
+  // Calculate power consumption based on mode
+  const distanceMoved = Math.abs(newFloor - elevator.currentFloor);
+  let powerConsumed = distanceMoved;
 
-  // Calculate new floor with jump
-  let newFloor = elevator.currentFloor + (direction === 'up' ? floorsToMove : -floorsToMove);
+  if (config.mode === 'power') {
+    powerConsumed = distanceMoved * 2; // High power consumption
+  } else if (config.mode === 'eco') {
+    powerConsumed = distanceMoved * 0.5; // Energy efficient
+  }
 
-  // Clamp: Don't overshoot target
-  if (direction === 'up' && newFloor > nextTarget) newFloor = nextTarget;
-  if (direction === 'down' && newFloor < nextTarget) newFloor = nextTarget;
-
-  // Check if we accidentally jumped over a different target?
-  // For simplicity, we only look at the PRIMARY target (index 0). 
-  // Advanced logic would check for intermediate stops. 
-  // We'll stick to primary target logic for MVP of "Power Mode".
-
-  // Moving cost: Base * floorsMoved? Or just per tick? 
-  // Power moves 2 floors in 1 tick. Cost should probably be higher per tick (already set to 5 vs 2).
-  // So standard 'costs.move' is per tick.
-
-  return addStats({
+  return {
     ...elevator,
     currentFloor: newFloor,
-    direction,
-    lastDirection: direction
-  }, 1, costs.move);
+    direction: moveDirection,
+    lastDirection: moveDirection,
+    targetFloors: sortedTargets,
+    stats: {
+      ...elevator.stats,
+      totalTravelTime: elevator.stats.totalTravelTime + 1,
+      powerConsumed: elevator.stats.powerConsumed + powerConsumed
+    }
+  };
 }
+
+// ============================================================================
+// DOOR MANAGEMENT
+// ============================================================================
+
+/**
+ * Update door state for an elevator.
+ */
+function updateDoorState(
+  elevator: ElevatorState,
+  config: BuildingConfig,
+  hasRequestAtFloor: boolean
+): ElevatorState {
+  const { doorState, doorOpenTicksRemaining, isHovered, currentFloor, targetFloors } = elevator;
+
+  // Check if we should open doors
+  const shouldOpen = targetFloors.includes(currentFloor) || hasRequestAtFloor;
+
+  switch (doorState) {
+    case 'closed':
+      if (shouldOpen) {
+        return { ...elevator, doorState: 'opening' };
+      }
+      return elevator;
+
+    case 'opening':
+      return {
+        ...elevator,
+        doorState: 'open',
+        doorOpenTicksRemaining: config.doorOpenTicks,
+        // Remove current floor from targets when doors open
+        targetFloors: targetFloors.filter(f => f !== currentFloor)
+      };
+
+    case 'open':
+      if (isHovered) {
+        // Hold doors open while hovered
+        return elevator;
+      }
+
+      if (doorOpenTicksRemaining > 0) {
+        return {
+          ...elevator,
+          doorOpenTicksRemaining: doorOpenTicksRemaining - 1
+        };
+      }
+
+      // Check if new request arrived while open
+      if (hasRequestAtFloor && !targetFloors.includes(currentFloor)) {
+        // Reset timer
+        return {
+          ...elevator,
+          doorOpenTicksRemaining: config.doorOpenTicks
+        };
+      }
+
+      return { ...elevator, doorState: 'closing' };
+
+    case 'closing':
+      // Re-open if new request arrives
+      if (hasRequestAtFloor || targetFloors.includes(currentFloor)) {
+        return { ...elevator, doorState: 'opening' };
+      }
+
+      return { ...elevator, doorState: 'closed' };
+
+    default:
+      return elevator;
+  }
+}
+
+// ============================================================================
+// REQUEST COMPLETION
+// ============================================================================
+
+/**
+ * Check if a request should be completed.
+ * Implements strict direction matching with terminal/turnaround exception.
+ */
+function shouldCompleteRequest(
+  elevator: ElevatorState,
+  request: Request
+): boolean {
+  // Must be at the floor with doors open
+  if (elevator.currentFloor !== request.floor) return false;
+  if (elevator.doorState !== 'open') return false;
+
+  // Car calls have no direction - always complete
+  if (!request.direction) return true;
+
+  // Idle elevator serves everything
+  if (elevator.direction === 'idle') return true;
+
+  // Check direction compatibility
+  const directionsMatch = elevator.direction === request.direction;
+
+  // Check if this is end of run (terminal/turnaround)
+  const hasTargetsAhead = elevator.direction === 'up'
+    ? elevator.targetFloors.some(f => f > elevator.currentFloor)
+    : elevator.targetFloors.some(f => f < elevator.currentFloor);
+
+  const isEndOfRun = !hasTargetsAhead;
+
+  // Complete if:\n  // 1. Directions match (compatible request - serve it regardless of end-of-run status)
+  // 2. Directions don't match AND is end of run (turnaround - serve opposite direction)
+  // 
+  // This handles three cases:
+  // - Pass-through: UP elevator at floor 5, UP request, continuing to floor 10 (match, not end)
+  // - Final destination: UP elevator at floor 8, UP request, no more targets (match, is end)
+  // - Turnaround: UP elevator at floor 10, DOWN request, no more UP targets (no match, is end)
+  //
+  // What we DON'T complete:
+  // - Incompatible pass-through: UP elevator at floor 5, DOWN request, continuing UP (no match, not end)
+  if (directionsMatch) return true;
+  if (!directionsMatch && isEndOfRun) return true;
+
+  return false;
+}
+
+/**
+ * Complete requests that are satisfied.
+ */
+function completeRequests(
+  state: SimulationState,
+  config: BuildingConfig
+): SimulationState {
+  let activeRequests = [...state.activeRequests];
+  let completedRequests = [...state.completedRequests];
+
+  for (let i = activeRequests.length - 1; i >= 0; i--) {
+    const request = activeRequests[i];
+    const elevator = state.elevators.find(e => e.id === request.assignedElevatorId);
+
+    if (!elevator) continue;
+
+    if (shouldCompleteRequest(elevator, request)) {
+      // Complete the request
+      const completedRequest: Request = {
+        ...request,
+        completedAtTick: state.clockTick
+      };
+
+      completedRequests.push(completedRequest);
+      activeRequests.splice(i, 1);
+    }
+  }
+
+  // Recalculate metrics from ALL completed requests
+  let totalWaitTime = 0;
+  let maxWaitTime = 0;
+
+  for (const req of completedRequests) {
+    if (req.completedAtTick !== undefined) {
+      const waitTime = req.completedAtTick - req.createdAtTick;
+      totalWaitTime += waitTime;
+      maxWaitTime = Math.max(maxWaitTime, waitTime);
+    }
+  }
+
+  const totalRequests = completedRequests.length;
+  const avgWaitTime = totalRequests > 0 ? totalWaitTime / totalRequests : 0;
+
+  return {
+    ...state,
+    activeRequests,
+    completedRequests,
+    metrics: {
+      avgWaitTime,
+      maxWaitTime,
+      totalRequests
+    }
+  };
+}
+
+// ============================================================================
+// LOGGING
+// ============================================================================
+
+function generateLogs(
+  prevState: SimulationState,
+  newState: SimulationState
+): SystemLogEntry[] {
+  const logs: SystemLogEntry[] = [];
+
+  for (let i = 0; i < newState.elevators.length; i++) {
+    const prev = prevState.elevators[i];
+    const curr = newState.elevators[i];
+
+    // Movement log
+    if (curr.currentFloor !== prev.currentFloor) {
+      logs.push({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: newState.clockTick,
+        type: 'movement',
+        summary: `Elevator ${curr.id} moved to Floor ${curr.currentFloor}`,
+        details: { from: prev.currentFloor, to: curr.currentFloor, direction: curr.direction },
+        timestamp: new Date().toISOString()
+      });
+    } else if (curr.direction === 'idle' && prev.direction !== 'idle') {
+      logs.push({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: newState.clockTick,
+        type: 'movement',
+        summary: `Elevator ${curr.id} stopped at Floor ${curr.currentFloor}`,
+        details: { floor: curr.currentFloor },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Door log
+    if (curr.doorState !== prev.doorState) {
+      logs.push({
+        id: `${Date.now()}-${Math.random()}`,
+        tick: newState.clockTick,
+        type: 'door',
+        summary: `Elevator ${curr.id} doors are ${curr.doorState}`,
+        details: { from: prev.doorState, to: curr.doorState, floor: curr.currentFloor },
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  return logs;
+}
+
+// ============================================================================
+// MAIN TICK FUNCTION
+// ============================================================================
 
 export function tickSimulation(
   state: SimulationState,
   config: BuildingConfig
 ): SimulationState {
-  const clockTick = state.clockTick + 1;
+  const prevState = state;
 
-  const elevators: ElevatorState[] = state.elevators.map((e) => ({ ...e }));
+  // 1. Dispatch pending requests
+  let newState = dispatchRequests(state, config);
 
-  // ASSIGNMENT PHASE
-  // 1. Reset targetFloors and rebuild from Active Requests to ensure persistence
-  elevators.forEach(e => {
-    e.targetFloors = [];
-  });
-
-  const nextActive: Request[] = [];
-  const remainingPending: Request[] = [];
-
-  // Re-process all active requests to ensure they are in target lists
-  for (const req of state.activeRequests) {
-    const elev = elevators.find(e => e.id === req.assignedElevatorId);
-    if (elev) {
-      // Check for STUCK LOOP condition:
-      // If elevator is at the floor, and direction is incompatible, DO NOT add to targetFloors.
-      // This allows the elevator to leave.
-      // It will re-add this floor to targets once it leaves (currentFloor != req.floor).
-      elev.targetFloors.push(req.floor);
-      nextActive.push(req);
-    } else {
-      // Orphaned request? Should not happen.
-      remainingPending.push({ ...req, assignedElevatorId: undefined });
-    }
-  }
-
-  // Process Pending Requests
-  for (const req of state.pendingRequests) {
-    if (req.assignedElevatorId) {
-      // Should have been in active? Or manually set? Handle as Active.
-      // Logic duplicate of above but simple adoption
-      const elev = elevators.find(e => e.id === req.assignedElevatorId);
-      if (elev) {
-        elev.targetFloors.push(req.floor);
-        nextActive.push(req);
-        continue;
-      }
-    }
-
-    // Hall Calls Logic
-    const elev = chooseElevatorForRequest(elevators, req, config.mode);
-    if (!elev) {
-      remainingPending.push(req);
-      continue;
-    }
-
-    // Assign
-    elev.targetFloors.push(req.floor);
-    nextActive.push({ ...req, assignedElevatorId: elev.id });
-  }
-
-  // Sort Targets and Update Direction (LOOK Algorithm)
-  elevators.forEach(e => {
-    // Remove duplicates
-    let targets = Array.from(new Set(e.targetFloors));
-
-    if (targets.length === 0) return;
-
-    const current = e.currentFloor;
-    const direction = e.direction;
-
-    // Filter targets into "ahead" (in current direction) and "behind" (requires reverse)
-    let ahead: number[] = [];
-    let behind: number[] = [];
-
-    if (direction === 'up') {
-      ahead = targets.filter(t => t >= current).sort((a, b) => a - b);
-      behind = targets.filter(t => t < current).sort((a, b) => b - a);
-    } else if (direction === 'down') {
-      ahead = targets.filter(t => t <= current).sort((a, b) => b - a);
-      behind = targets.filter(t => t > current).sort((a, b) => a - b);
-    } else {
-      targets.sort((a, b) => Math.abs(current - a) - Math.abs(current - b));
-      ahead = targets;
-    }
-
-    // Reconstruct target list
-    e.targetFloors = [...ahead, ...behind];
-
-    // PEEK CHECK:
-    // Only perform this check if we are "Passing Through" (continuing in same direction).
-    // If we are reversing (Turnaround), we generally MUST stop to service the terminal request.
-    // e.g. Arriving Down at 3, next target > 3 (Up). We stop at 3 to serve Down, then flip.
-    if (e.targetFloors.length > 0 && e.targetFloors[0] === current) {
-      const nextStop = e.targetFloors.length > 1 ? e.targetFloors[1] : undefined;
-
-      // Predict direction after stop
-      let nextDir: Direction = 'idle';
-      if (nextStop !== undefined) {
-        if (nextStop > current) nextDir = 'up';
-        else if (nextStop < current) nextDir = 'down';
-      }
-
-      // If we are Turning Around (nextDir !== direction), we SKIP the peek check.
-      // We assume we must stop to service the request that ends our current run.
-      // Exception: If nextDir is idle, we treat as passing through (or end of line).
-      if (nextDir !== 'idle' && nextDir !== direction) {
-        // Turnaround: Allow stop.
-      } else {
-        // Passing Through or End of Line: Verify compatibility.
-        // Find if there is ANY compatible request for this floor
-        const hasCompatibleRequest = nextActive.some(req =>
-          req.floor === current &&
-          req.assignedElevatorId === e.id &&
-          (
-            !req.direction || // Car call
-            nextDir === 'idle' ||
-            nextDir === req.direction
-          )
-        );
-
-        if (!hasCompatibleRequest) {
-          // No compatible request for the direction we are about to leave in.
-          // Skip this stop.
-          e.targetFloors.shift();
-        }
-      }
-    }
-  });
-
-  // MOVEMENT PHASE
-  const prevElevators = state.elevators;
-  const updatedElevators = elevators.map((e) => stepElevator(e, config));
-
-  // UPDATE TRAVEL LOG (only record stops where doors open, to avoid intermediate floors)
-  const travelLog: Record<string, number[]> = { ...state.travelLog };
-  updatedElevators.forEach((elevator, index) => {
-    const prev = prevElevators[index];
-    if (!prev) return;
-
-    // Log only when we are arriving at a floor and starting to open doors,
-    // which corresponds to a meaningful stop in the travel sequence.
-    if (elevator.doorState === 'opening') {
-      const seq = travelLog[elevator.id] ?? [prev.currentFloor];
-      const last = seq[seq.length - 1];
-      if (last !== elevator.currentFloor) {
-        travelLog[elevator.id] = [...seq, elevator.currentFloor];
-      } else {
-        travelLog[elevator.id] = seq;
-      }
-    }
-  });
-
-  // COMPLETION + METRICS PHASE
-  const stillActive: Request[] = [];
-  const completed: Request[] = [...state.completedRequests];
-
-  let totalRequests = state.metrics.totalRequests;
-  let totalWaitTime = state.metrics.avgWaitTime * state.metrics.totalRequests;
-  let maxWaitTime = state.metrics.maxWaitTime;
-
-  for (const req of nextActive) {
-    const servingElevator = updatedElevators.find(
-      (e) =>
-        e.id === req.assignedElevatorId &&
-        e.doorState === 'open' &&
-        e.currentFloor === req.floor
+  // 2. Update each elevator
+  const updatedElevators = newState.elevators.map(elevator => {
+    // Check if there are requests at current floor
+    const hasRequestAtFloor = newState.activeRequests.some(
+      r => r.assignedElevatorId === elevator.id && r.floor === elevator.currentFloor
     );
 
-    let isCompleted = false;
+    // Update doors first
+    let updated = updateDoorState(elevator, config, hasRequestAtFloor);
 
-    if (servingElevator && !req.completedAtTick) {
-      const isCompatible =
-        !req.direction ||
-        servingElevator.direction === 'idle' ||
-        servingElevator.direction === req.direction ||
-        // Fix for Door Loop at Terminal Floors:
-        // If this is the LAST target (or only target), we effectively treat it as compatible
-        // because the elevator will become Idle or flip direction after this.
-        // We check targetFloors length. Since we are IN the target floor, it should be in the list (or just removed).
-        // Actually, stepElevator removes the target when it arrives? No, stepElevator removes it when it opens doors.
-        // But here we are in 'open' state. So targetFloors should NOT contain the current floor anymore?
-        // Let's check stepElevator. 
-        // Yes: `const [, ...restTargets] = elevator.targetFloors;` -> removes it.
-        // So if we are at the floor and open, `targetFloors` should be empty (if that was the only one) 
-        // OR start with the NEXT target.
-        servingElevator.targetFloors.length === 0 ||
-        (servingElevator.targetFloors.length > 0 && servingElevator.targetFloors[0] !== req.floor);
-      // Wait, if we have further targets, we should only be compatible if direction matches.
-      // But if we are at the terminal floor, we usually don't have further targets in the *current* direction.
-      // If targetFloors is empty, we are compatible (End of Run).
-
-      // Refined Logic for Terminal/Turnaround Completion:
-      // We check if we are at the "End of Run" in the current direction.
-      // If we are UP, and have no targets > current, we are at the end.
-      // If we are DOWN, and have no targets < current, we are at the end.
-      const hasStrictlyHigherTargets = servingElevator.targetFloors.some(f => f > servingElevator.currentFloor);
-      const hasStrictlyLowerTargets = servingElevator.targetFloors.some(f => f < servingElevator.currentFloor);
-
-      let isEndOfRun = false;
-      if (servingElevator.direction === 'up' && !hasStrictlyHigherTargets) isEndOfRun = true;
-      else if (servingElevator.direction === 'down' && !hasStrictlyLowerTargets) isEndOfRun = true;
-      else if (servingElevator.direction === 'idle') isEndOfRun = true;
-
-      if (isCompatible || isEndOfRun) {
-        // When serving a hall request, pin the visible direction to the
-        // request's direction (up/down) while at the destination floor.
-        if (req.direction) {
-          servingElevator.lastDirection = req.direction;
-        }
-
-        const completedAtTick = clockTick;
-        const waitTime = completedAtTick - req.createdAtTick;
-
-        totalRequests += 1;
-        totalWaitTime += waitTime;
-        maxWaitTime = Math.max(maxWaitTime, waitTime);
-
-        completed.push({
-          ...req,
-          completedAtTick
-        });
-        isCompleted = true;
-      }
+    // Move only if doors are closed
+    if (updated.doorState === 'closed') {
+      updated = moveElevator(updated, config);
     }
 
-    if (!isCompleted) {
-      stillActive.push(req);
-    }
-  }
-
-  const avgWaitTime = totalRequests === 0 ? 0 : totalWaitTime / totalRequests;
-
-  // SYSTEM LOGGING: Detect changes for Movement and Doors
-  let newLogs: SystemLogEntry[] = [...state.systemLogs];
-
-  updatedElevators.forEach((elev, idx) => {
-    const prev = prevElevators[idx];
-    if (!prev) return;
-
-    // 1. Movement Log
-    if (elev.currentFloor !== prev.currentFloor) {
-      newLogs.unshift({
-        id: `${Date.now()}-${Math.random()}`,
-        tick: clockTick,
-        type: 'movement',
-        summary: `Elevator ${elev.id} moved to Floor ${elev.currentFloor}`,
-        details: { from: prev.currentFloor, to: elev.currentFloor, direction: elev.direction },
-        timestamp: new Date().toISOString()
-      });
-    } else if (elev.currentFloor === prev.currentFloor && elev.direction === 'idle' && prev.direction !== 'idle') {
-      // Stopped?
-      newLogs.unshift({
-        id: `${Date.now()}-${Math.random()}`,
-        tick: clockTick,
-        type: 'movement',
-        summary: `Elevator ${elev.id} stopped at Floor ${elev.currentFloor}`,
-        details: { floor: elev.currentFloor },
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 2. Door Log
-    if (elev.doorState !== prev.doorState) {
-      newLogs.unshift({
-        id: `${Date.now()}-${Math.random()}`,
-        tick: clockTick,
-        type: 'door',
-        summary: `Elevator ${elev.id} doors are ${elev.doorState}`,
-        details: { from: prev.doorState, to: elev.doorState, floor: elev.currentFloor },
-        timestamp: new Date().toISOString()
-      });
-    }
+    return updated;
   });
 
-  // Cap logs at 500
-  if (newLogs.length > 500) {
-    newLogs = newLogs.slice(0, 500);
+  newState = {
+    ...newState,
+    elevators: updatedElevators
+  };
+
+  // 3. Complete requests
+  newState = completeRequests(newState, config);
+
+  // 4. Update travel logs
+  const travelLog = { ...newState.travelLog };
+  for (const elevator of newState.elevators) {
+    const prevFloor = prevState.elevators.find(e => e.id === elevator.id)?.currentFloor;
+    if (prevFloor !== elevator.currentFloor) {
+      travelLog[elevator.id] = [...(travelLog[elevator.id] || []), elevator.currentFloor];
+    }
   }
 
+  // 5. Generate logs
+  const newLogs = generateLogs(prevState, newState);
+
   return {
-    ...state,
-    clockTick,
-    elevators: updatedElevators,
-    pendingRequests: remainingPending,
-    activeRequests: stillActive,
-    completedRequests: completed,
+    ...newState,
+    clockTick: state.clockTick + 1,
     travelLog,
-    metrics: {
-      avgWaitTime,
-      maxWaitTime,
-      totalRequests
-    },
-    systemLogs: newLogs
+    systemLogs: [...newLogs, ...newState.systemLogs].slice(0, 500)
   };
 }
-

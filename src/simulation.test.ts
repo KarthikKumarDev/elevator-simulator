@@ -317,6 +317,14 @@ describe('Elevator Simulation Logic', () => {
       // Requests
       state = addRequest(state, { type: 'hall', floor: 5, direction: 'up' });
       state = addRequest(state, { type: 'hall', floor: 5, direction: 'down' });
+      // Add request for continuation floor so isEndOfRun is false
+      state = addRequest(state, { type: 'hall', floor: 10, direction: 'down' });
+      const req10 = state.pendingRequests.pop();
+      if (req10) {
+        req10.assignedElevatorId = state.elevators[0].id;
+        state.activeRequests.push(req10);
+      }
+
       state = runTicks(state, TEST_CONFIG, 5); // Arrive and Open (Increased ticks)
 
       // Verify UP is completed, DOWN is active/pending
@@ -337,6 +345,15 @@ describe('Elevator Simulation Logic', () => {
 
       state = addRequest(state, { type: 'hall', floor: 5, direction: 'up' });
       state = addRequest(state, { type: 'hall', floor: 5, direction: 'down' });
+
+      // Add request for continuation floor so isEndOfRun is false. Manually assign to E1.
+      state = addRequest(state, { type: 'hall', floor: 1, direction: 'up' });
+      const req1 = state.pendingRequests.pop();
+      if (req1) {
+        req1.assignedElevatorId = state.elevators[0].id;
+        state.activeRequests.push(req1);
+      }
+
       state = runTicks(state, TEST_CONFIG, 5); // Arrive and Open (Increased ticks)
 
       const downReq = state.completedRequests.find(r => r.floor === 5 && r.direction === 'down');
