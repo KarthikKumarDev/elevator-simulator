@@ -223,7 +223,116 @@ function dispatchRequests(
   let pendingRequests = [...state.pendingRequests];
   let activeRequests = [...state.activeRequests];
 
-  // Process each pending request
+  // Normal mode: Check for dual-direction requests at same floor
+  if (config.mode === 'normal') {
+    // Group pending hall requests by floor
+    const hallRequestsByFloor = new Map<number, { up?: typeof pendingRequests[0], down?: typeof pendingRequests[0] }>();
+
+    for (const request of pendingRequests) {
+      if (request.type === 'hall' && !request.assignedElevatorId) {
+        const floorRequests = hallRequestsByFloor.get(request.floor) || {};
+        if (request.direction === 'up') {
+          floorRequests.up = request;
+        } else if (request.direction === 'down') {
+          floorRequests.down = request;
+        }
+        hallRequestsByFloor.set(request.floor, floorRequests);
+      }
+    }
+
+    // For floors with both UP and DOWN requests, assign to different elevators
+    // BUT only handle ONE floor at a time to avoid exhausting all elevators
+    // AND only if we have at least 2 idle elevators available
+    const idleElevators = elevators.filter(e => e.direction === 'idle' && e.targetFloors.length === 0);
+    let dualFloor: number | null = null;
+    let oldestTick = Infinity;
+
+    if (idleElevators.length >= 2) {
+      for (const [floor, requests] of hallRequestsByFloor) {
+        if (requests.up && requests.down) {
+          const minTick = Math.min(requests.up.createdAtTick || 0, requests.down.createdAtTick || 0);
+          if (minTick < oldestTick) {
+            oldestTick = minTick;
+            dualFloor = floor;
+          }
+        }
+      }
+    }
+
+    // Assign dual-direction for the selected floor only
+    if (dualFloor !== null) {
+      const requests = hallRequestsByFloor.get(dualFloor)!;
+
+      // Find two different best elevators
+      let bestElevatorUp: ElevatorState | null = null;
+      let bestCostUp = Infinity;
+      let bestElevatorDown: ElevatorState | null = null;
+      let bestCostDown = Infinity;
+
+      // Find best elevator for UP request
+      for (const elevator of elevators) {
+        const cost = calculateCost(elevator, requests.up!, config.mode);
+        if (cost < bestCostUp) {
+          bestCostUp = cost;
+          bestElevatorUp = elevator;
+        }
+      }
+
+      // Find best elevator for DOWN request (must be different from UP)
+      for (const elevator of elevators) {
+        if (elevator.id === bestElevatorUp?.id) continue; // Skip the one assigned to UP
+        const cost = calculateCost(elevator, requests.down!, config.mode);
+        if (cost < bestCostDown) {
+          bestCostDown = cost;
+          bestElevatorDown = elevator;
+        }
+      }
+
+      // Assign UP request
+      if (bestElevatorUp) {
+        const assignedRequestUp = {
+          ...requests.up!,
+          assignedElevatorId: bestElevatorUp.id
+        };
+        activeRequests.push(assignedRequestUp);
+        const upIndex = pendingRequests.findIndex(r => r === requests.up);
+        if (upIndex >= 0) pendingRequests.splice(upIndex, 1);
+
+        elevators = elevators.map(e => {
+          if (e.id === bestElevatorUp!.id) {
+            return {
+              ...e,
+              targetFloors: [...e.targetFloors, assignedRequestUp.floor]
+            };
+          }
+          return e;
+        });
+      }
+
+      // Assign DOWN request
+      if (bestElevatorDown) {
+        const assignedRequestDown = {
+          ...requests.down!,
+          assignedElevatorId: bestElevatorDown.id
+        };
+        activeRequests.push(assignedRequestDown);
+        const downIndex = pendingRequests.findIndex(r => r === requests.down);
+        if (downIndex >= 0) pendingRequests.splice(downIndex, 1);
+
+        elevators = elevators.map(e => {
+          if (e.id === bestElevatorDown!.id) {
+            return {
+              ...e,
+              targetFloors: [...e.targetFloors, assignedRequestDown.floor]
+            };
+          }
+          return e;
+        });
+      }
+    }
+  }
+
+  // Process remaining pending requests (single-direction or non-Normal mode)
   for (let i = pendingRequests.length - 1; i >= 0; i--) {
     const request = pendingRequests[i];
 

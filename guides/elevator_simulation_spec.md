@@ -90,7 +90,7 @@ A request is marked **Completed** only when:
     - Assigns requests to the elevator with the lowest "Cost" (Distance + Compatibility).
     - Passing elevators will pick up passengers (Piggybacking).
     - Idle elevators will be awakened if they are the closest or best option.
-- **Conflict Handling**: Standard behavior. If one elevator serves UP, a second elevator *may* serve DOWN if it is nearby and available, but the system does not force spread.
+- **Conflict Handling**: **Dual-Direction Dispatch** (when resources permit). When both UP and DOWN requests exist at the same floor AND at least 2 idle elevators are available, the system assigns two different elevators to handle them simultaneously. This ensures better service quality while preventing elevator starvation when resources are limited.
 
 ### 3. Power Mode (Turbo / High Performance)
 - **Goal**: Minimize Passenger Wait Times.

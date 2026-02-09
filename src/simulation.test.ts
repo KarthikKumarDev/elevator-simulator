@@ -181,6 +181,27 @@ describe('Elevator Simulation Logic', () => {
       // UP: 2, 5, 8
       expect(state.elevators[0].targetFloors).toEqual([2, 5, 8]);
     });
+
+    it('TC19: Dual Direction - Normal mode should assign two different elevators for UP and DOWN at same floor', () => {
+      let state = createInitialState(TEST_CONFIG);
+
+      // Add both UP and DOWN requests at floor 5
+      state = addRequest(state, { type: 'hall', floor: 5, direction: 'up' });
+      state = addRequest(state, { type: 'hall', floor: 5, direction: 'down' });
+      state = runTicks(state, TEST_CONFIG, 1);
+
+      // Both requests should be assigned
+      const upReq = state.activeRequests.find(r => r.floor === 5 && r.direction === 'up');
+      const downReq = state.activeRequests.find(r => r.floor === 5 && r.direction === 'down');
+
+      expect(upReq).toBeDefined();
+      expect(downReq).toBeDefined();
+      expect(upReq?.assignedElevatorId).toBeDefined();
+      expect(downReq?.assignedElevatorId).toBeDefined();
+
+      // They should be assigned to DIFFERENT elevators
+      expect(upReq?.assignedElevatorId).not.toBe(downReq?.assignedElevatorId);
+    });
   });
 
   // ==========================================
