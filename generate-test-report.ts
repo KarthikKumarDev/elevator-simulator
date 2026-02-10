@@ -89,38 +89,51 @@ function extractTestCodeFromFile(content: string): Record<string, string> {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/\s*(it|test)\(['"](TC\.[A-Z]+\.\d+)/);
+    const isTestBlock = /^\s*(it|test)\(/.test(line);
 
-    if (match) {
-      const testId = match[2];
-      let code = line + '\n';
-      // Count braces to find end of test block
-      let openBraces = (line.match(/{/g) || []).length;
-      let closeBraces = (line.match(/}/g) || []).length;
-      let braceBalance = openBraces - closeBraces;
+    if (isTestBlock) {
+      const testIds = line.match(/TC\.[A-Z]+\.\d+/g);
 
-      let j = i + 1;
-      while (j < lines.length) {
-        const nextLine = lines[j];
-        code += nextLine + '\n';
+      if (testIds && testIds.length > 0) {
+        let code = line + '\n';
+        let openBraces = (line.match(/{/g) || []).length;
+        let closeBraces = (line.match(/}/g) || []).length;
+        let braceBalance = openBraces - closeBraces;
 
-        const nextOpen = (nextLine.match(/{/g) || []).length;
-        const nextClose = (nextLine.match(/}/g) || []).length;
-        braceBalance += (nextOpen - nextClose);
-
-        if (braceBalance <= 0 && openBraces > 0) {
-          break;
+        // If it's a single line test block with balanced braces
+        if (openBraces > 0 && braceBalance === 0) {
+          const normalized = normalizeIndentation(code);
+          testIds.forEach(id => {
+            codeMap[id] = normalized;
+          });
+          continue;
         }
 
-        // Fallback for one-liners without braces
-        if (openBraces === 0 && nextLine.includes(');')) {
-          break;
+        let j = i + 1;
+        while (j < lines.length) {
+          const nextLine = lines[j];
+          code += nextLine + '\n';
+
+          const nextOpen = (nextLine.match(/{/g) || []).length;
+          const nextClose = (nextLine.match(/}/g) || []).length;
+          braceBalance += (nextOpen - nextClose);
+
+          if (braceBalance <= 0 && openBraces > 0) {
+            break;
+          }
+
+          // Fallback for one-liners without braces
+          if (openBraces === 0 && nextLine.includes(');')) {
+            break;
+          }
+          j++;
         }
-        j++;
+
+        const normalized = normalizeIndentation(code);
+        testIds.forEach(id => {
+          codeMap[id] = normalized;
+        });
       }
-
-      // Clean up common indentation
-      codeMap[testId] = normalizeIndentation(code);
     }
   }
   return codeMap;
