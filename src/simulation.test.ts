@@ -26,17 +26,17 @@ const POWER_CONFIG: BuildingConfig = { ...TEST_CONFIG, mode: 'power' };
 describe('Elevator Simulation Logic', () => {
 
   // ==========================================
-  // A. Initialization & Configuration (TC01-TC05)
+  // A. Initialization & Configuration (TC.SIM.01-TC.SIM.05)
   // ==========================================
   describe('A. Initialization & Configuration', () => {
-    it('TC01: Setup - Should initialize with correct number of elevators and zero metrics', () => {
+    it('TC.SIM.01: Setup - Should initialize with correct number of elevators and zero metrics', () => {
       const state = createInitialState(TEST_CONFIG);
       expect(state.elevators).toHaveLength(3);
       expect(state.metrics.totalRequests).toBe(0);
       expect(state.elevators[0].currentFloor).toBe(1);
     });
 
-    it('TC02: Default State - Elevators should start Idle and Closed at Floor 1', () => {
+    it('TC.SIM.02: Default State - Elevators should start Idle and Closed at Floor 1', () => {
       const state = createInitialState(TEST_CONFIG);
       state.elevators.forEach(e => {
         expect(e.direction).toBe('idle');
@@ -44,13 +44,13 @@ describe('Elevator Simulation Logic', () => {
       });
     });
 
-    it('TC03: Metrics - Should initialize all metrics to zero', () => {
+    it('TC.SIM.03: Metrics - Should initialize all metrics to zero', () => {
       const state = createInitialState(TEST_CONFIG);
       expect(state.metrics.avgWaitTime).toBe(0);
       expect(state.metrics.maxWaitTime).toBe(0);
     });
 
-    it('TC04: Config Change - Should update state when configuration changes (e.g., more elevators)', () => {
+    it('TC.SIM.04: Config Change - Should update state when configuration changes (e.g., more elevators)', () => {
       // Not directly testable via simulation.ts alone as state persistence is in App.tsx
       // But we can verify createInitialState with new config
       const NEW_CONFIG = { ...TEST_CONFIG, elevators: 5 };
@@ -58,7 +58,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators).toHaveLength(5);
     });
 
-    it('TC05: Mode Switching - Should handle simulation mode updates without crashing', () => {
+    it('TC.SIM.05: Mode Switching - Should handle simulation mode updates without crashing', () => {
       // Simulate switching mode by passing different config to tick
       let state = createInitialState(TEST_CONFIG);
       state = tickSimulation(state, ECO_CONFIG); // Switch to Eco
@@ -68,17 +68,17 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // B. Request Management (TC06-TC13)
+  // B. Request Management (TC.SIM.06-TC.SIM.13)
   // ==========================================
   describe('B. Request Management', () => {
-    it('TC06: Hall Call - Should add a hall call to the pending queue', () => {
+    it('TC.SIM.06: Hall Call - Should add a hall call to the pending queue', () => {
       let state = createInitialState(TEST_CONFIG);
       state = addRequest(state, { type: 'hall', floor: 3, direction: 'up' });
       expect(state.pendingRequests).toHaveLength(1);
       expect(state.pendingRequests[0].floor).toBe(3);
     });
 
-    it('TC07: Car Call - Should immediately assign car calls to the specific elevator', () => {
+    it('TC.SIM.07: Car Call - Should immediately assign car calls to the specific elevator', () => {
       let state = createInitialState(TEST_CONFIG);
       state = toggleCarRequest(state, 'E1', 5);
       // Car calls are immediately assigned if toggleCarRequest logic adds them as 'active' (or pending with ID)
@@ -89,7 +89,7 @@ describe('Elevator Simulation Logic', () => {
       expect(e1?.targetFloors).toContain(5);
     });
 
-    it('TC08: Idempotency - Should handle duplicate hall calls without crashing (Check duplicates allowed)', () => {
+    it('TC.SIM.08: Idempotency - Should handle duplicate hall calls without crashing (Check duplicates allowed)', () => {
       // Logic allows duplicates in list, UI handles filtering.
       let state = createInitialState(TEST_CONFIG);
       state = addRequest(state, { type: 'hall', floor: 3, direction: 'up' });
@@ -97,7 +97,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.pendingRequests.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('TC10: Car Call Toggle - Should add and remove target floors when toggled', () => {
+    it('TC.SIM.10: Car Call Toggle - Should add and remove target floors when toggled', () => {
       let state = createInitialState(TEST_CONFIG);
       state = toggleCarRequest(state, 'E1', 5); // On
       // Need tick to process
@@ -109,13 +109,13 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].targetFloors).not.toContain(5);
     });
 
-    it('TC11: Invalid Request - Should ignore or clamp invalid floor numbers', () => {
+    it('TC.SIM.11: Invalid Request - Should ignore or clamp invalid floor numbers', () => {
       // toggleCarRequest handles logic?
       // Not explicitly clamped in helper.
       // Skipping unless we add validation.
     });
 
-    it('TC12: Multi-Request - Should handle simultaneous UP and DOWN requests correctly', () => {
+    it('TC.SIM.12: Multi-Request - Should handle simultaneous UP and DOWN requests correctly', () => {
       let state = createInitialState(TEST_CONFIG);
       state = addRequest(state, { type: 'hall', floor: 2, direction: 'up' });
       state = addRequest(state, { type: 'hall', floor: 8, direction: 'down' });
@@ -125,10 +125,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // C. Dispatching: Normal Mode (TC14-TC21)
+  // C. Dispatching: Normal Mode (TC.SIM.14-TC.SIM.21)
   // ==========================================
   describe('C. Dispatching: Normal Mode', () => {
-    it('TC14: Nearest Neighbor - Should assign request to the closest available elevator', () => {
+    it('TC.SIM.14: Nearest Neighbor - Should assign request to the closest available elevator', () => {
       let state = createInitialState(TEST_CONFIG);
       // E1 at 1. E2 at 1.
       // Move E2 to 8.
@@ -142,7 +142,7 @@ describe('Elevator Simulation Logic', () => {
       expect(req?.assignedElevatorId).toBe('E2');
     });
 
-    it('TC15: Piggybacking UP - Moving elevator should pick up compatible UP call on its path', () => {
+    it('TC.SIM.15: Piggybacking UP - Moving elevator should pick up compatible UP call on its path', () => {
       let state = createInitialState(TEST_CONFIG);
       state = toggleCarRequest(state, 'E1', 10);
       state = runTicks(state, TEST_CONFIG, 2); // Moving Up
@@ -155,7 +155,7 @@ describe('Elevator Simulation Logic', () => {
       expect(req?.assignedElevatorId).toBe('E1');
     });
 
-    it('TC17: Direction Priority - Elevator moving UP should ignore incompatible DOWN call (assign to Idle)', () => {
+    it('TC.SIM.17: Direction Priority - Elevator moving UP should ignore incompatible DOWN call (assign to Idle)', () => {
       let state = createInitialState(TEST_CONFIG);
       // E1 going UP from 1 to 10
       state = toggleCarRequest(state, 'E1', 10);
@@ -171,7 +171,7 @@ describe('Elevator Simulation Logic', () => {
       expect(req?.assignedElevatorId).toBe('E2');
     });
 
-    it('TC18: Target Sorting - Should sort targets based on current direction (Up=Ascending)', () => {
+    it('TC.SIM.18: Target Sorting - Should sort targets based on current direction (Up=Ascending)', () => {
       let state = createInitialState(TEST_CONFIG);
       state = toggleCarRequest(state, 'E1', 8);
       state = toggleCarRequest(state, 'E1', 2);
@@ -182,7 +182,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].targetFloors).toEqual([2, 5, 8]);
     });
 
-    it('TC19: Dual Direction - Normal mode should assign two different elevators for UP and DOWN at same floor', () => {
+    it('TC.SIM.19: Dual Direction - Normal mode should assign two different elevators for UP and DOWN at same floor', () => {
       let state = createInitialState(TEST_CONFIG);
 
       // Add both UP and DOWN requests at floor 5
@@ -205,10 +205,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // D. Dispatching: Eco Mode (TC22-TC28)
+  // D. Dispatching: Eco Mode (TC.SIM.22-TC.SIM.28)
   // ==========================================
   describe('D. Dispatching: Eco Mode', () => {
-    it('TC23: Idle Preservation - Should NOT wake an idle elevator if an active one can eventually serve', () => {
+    it('TC.SIM.23: Idle Preservation - Should NOT wake an idle elevator if an active one can eventually serve', () => {
       let state = createInitialState(ECO_CONFIG);
       const e1 = state.elevators[0];
       const e2 = state.elevators[1];
@@ -230,14 +230,14 @@ describe('Elevator Simulation Logic', () => {
       if (req) expect(req.assignedElevatorId).toBe(e1.id);
     });
 
-    it('TC26: Zero Idle Power - Idle elevators should consume zero power', () => {
+    it('TC.SIM.26: Zero Idle Power - Idle elevators should consume zero power', () => {
       let state = createInitialState(ECO_CONFIG);
       const startP = state.elevators[0].stats.powerConsumed;
       state = runTicks(state, ECO_CONFIG, 20);
       expect(state.elevators[0].stats.powerConsumed).toBe(startP);
     });
 
-    it('TC28: Efficiency Metric - Eco Mode should consume less power than Normal Mode for same trip', () => {
+    it('TC.SIM.28: Efficiency Metric - Eco Mode should consume less power than Normal Mode for same trip', () => {
       // Move 10 floors normal vs eco
       const run = (cfg: BuildingConfig) => {
         let s = createInitialState(cfg);
@@ -252,10 +252,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // E. Dispatching: Power Mode (TC29-TC33)
+  // E. Dispatching: Power Mode (TC.SIM.29-TC.SIM.33)
   // ==========================================
   describe('E. Dispatching: Power Mode', () => {
-    it('TC29: Turbo Speed - Elevator should jump floors when moving large distances', () => {
+    it('TC.SIM.29: Turbo Speed - Elevator should jump floors when moving large distances', () => {
       let state = createInitialState(POWER_CONFIG);
       state = toggleCarRequest(state, 'E1', 5);
       state = runTicks(state, POWER_CONFIG, 1);
@@ -263,7 +263,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].currentFloor).toBe(3);
     });
 
-    it('TC30: Destination Clamping - Should NOT jump past the target floor', () => {
+    it('TC.SIM.30: Destination Clamping - Should NOT jump past the target floor', () => {
       let state = createInitialState(POWER_CONFIG);
       // At 1. Target 2. Dist 1. Should NOT jump.
       state = toggleCarRequest(state, 'E1', 2);
@@ -272,7 +272,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].currentFloor).toBe(2);
     });
 
-    it('TC31: Aggressive Dispatch - Should dispatch nearest Idle elevator immediately to minimize wait', () => {
+    it('TC.SIM.31: Aggressive Dispatch - Should dispatch nearest Idle elevator immediately to minimize wait', () => {
       // E1 busy UP. E2 Idle. Req DOWN.
       // Power mode dispatches E2 immediately.
       let state = createInitialState(POWER_CONFIG);
@@ -288,10 +288,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // F. Movement & Door Physics (TC34-TC40)
+  // F. Movement & Door Physics (TC.SIM.34-TC.SIM.40)
   // ==========================================
   describe('F. Movement & Door Physics', () => {
-    it('TC34: Door Cycle - Should progress from Closed -> Opening -> Open', () => {
+    it('TC.SIM.34: Door Cycle - Should progress from Closed -> Opening -> Open', () => {
       let state = createInitialState(TEST_CONFIG);
       // Check closed
       expect(state.elevators[0].doorState).toBe('closed');
@@ -302,7 +302,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].doorState).toMatch(/opening|open/);
     });
 
-    it('TC36: Hover Behavior - Doors should remain Open indefinitely when hovered', () => {
+    it('TC.SIM.36: Hover Behavior - Doors should remain Open indefinitely when hovered', () => {
       let state = createInitialState(TEST_CONFIG);
       state.elevators[0].doorState = 'open';
       state.elevators[0].doorOpenTicksRemaining = 2;
@@ -315,7 +315,7 @@ describe('Elevator Simulation Logic', () => {
       expect(state.elevators[0].doorOpenTicksRemaining).toBeGreaterThan(0); // Helper func might reset it or hold it
     });
 
-    it('TC38: Re-Open Logic - Doors should revert to Opening if a request arrives while Closing', () => {
+    it('TC.SIM.38: Re-Open Logic - Doors should revert to Opening if a request arrives while Closing', () => {
       let state = createInitialState(TEST_CONFIG);
       state.elevators[0].doorState = 'closing';
       state = addRequest(state, { type: 'hall', floor: 1, direction: 'up' });
@@ -325,10 +325,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // G. Direction Compatibility Logic (TC41-TC45)
+  // G. Direction Compatibility Logic (TC.SIM.41-TC.SIM.45)
   // ==========================================
   describe('G. Direction Compatibility', () => {
-    it('TC41: Strict Direction (UP) - Should serve UP call but keep incompatible DOWN call active', () => {
+    it('TC.SIM.41: Strict Direction (UP) - Should serve UP call but keep incompatible DOWN call active', () => {
       let state = createInitialState(TEST_CONFIG);
       // E1 Arriving UP at 5, Continuing to 10
       state.elevators[0].currentFloor = 4;
@@ -357,7 +357,7 @@ describe('Elevator Simulation Logic', () => {
       expect(downReq).toBeDefined(); // Still active, not completed
     });
 
-    it('TC42: Strict Direction (DOWN) - Should serve DOWN call but keep incompatible UP call active', () => {
+    it('TC.SIM.42: Strict Direction (DOWN) - Should serve DOWN call but keep incompatible UP call active', () => {
       let state = createInitialState(TEST_CONFIG);
       // E1 Arriving DOWN at 5, Continuing to 1
       state.elevators[0].currentFloor = 6;
@@ -384,7 +384,7 @@ describe('Elevator Simulation Logic', () => {
       expect(upReq).toBeDefined(); // Should remain active (ignored)
     });
 
-    it('TC43: Idle Service - Idle elevator should serve both directions at same floor', () => {
+    it('TC.SIM.43: Idle Service - Idle elevator should serve both directions at same floor', () => {
       let state = createInitialState(TEST_CONFIG);
       // E1 Idle at 5.
       state.elevators[0].currentFloor = 5;
@@ -428,10 +428,10 @@ describe('Elevator Simulation Logic', () => {
   });
 
   // ==========================================
-  // H. Metrics & Logging (TC46-TC50)
+  // H. Metrics & Logging (TC.SIM.46-TC.SIM.50)
   // ==========================================
   describe('H. Metrics & Logging', () => {
-    it('TC46: Wait Time - Should calculate non-zero wait time for served requests', () => {
+    it('TC.SIM.46: Wait Time - Should calculate non-zero wait time for served requests', () => {
       let state = createInitialState(TEST_CONFIG);
       // Request Floor 2. Requires travel (at least 1 tick).
       state = toggleCarRequest(state, 'E1', 2);
@@ -441,14 +441,14 @@ describe('Elevator Simulation Logic', () => {
       expect(state.metrics.avgWaitTime).toBeGreaterThan(0);
     });
 
-    it('TC48: Total Requests - Should correctly increment total requests count', () => {
+    it('TC.SIM.48: Total Requests - Should correctly increment total requests count', () => {
       let state = createInitialState(TEST_CONFIG);
       state = toggleCarRequest(state, 'E1', 1);
       state = runTicks(state, TEST_CONFIG, 2);
       expect(state.metrics.totalRequests).toBe(1);
     });
 
-    it('TC49: Travel Log - Should record floors visited in correct sequence', () => {
+    it('TC.SIM.49: Travel Log - Should record floors visited in correct sequence', () => {
       let state = createInitialState(TEST_CONFIG);
       // Move 1 -> 2
       state = toggleCarRequest(state, 'E1', 2);
