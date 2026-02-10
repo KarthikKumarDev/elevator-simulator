@@ -97,22 +97,23 @@ describe('DebugModal Component', () => {
         );
 
         const copyButton = screen.getByText('Copy JSON');
-        fireEvent.click(copyButton);
 
-        // Wait for the async clipboard operation and state update
-        await waitFor(() => {
-            expect(screen.getByText('Copied!')).toBeInTheDocument();
-        }, { timeout: 100 });
+        await act(async () => {
+            fireEvent.click(copyButton);
+            // Flush promises to allow async clipboard operation to complete
+            await Promise.resolve();
+        });
+
+        // Should show "Copied!" after async operation
+        expect(screen.getByText('Copied!')).toBeInTheDocument();
 
         // Advance timers by 2 seconds
-        act(() => {
+        await act(async () => {
             vi.advanceTimersByTime(2000);
         });
 
-        // Wait for state to revert
-        await waitFor(() => {
-            expect(screen.getByText('Copy JSON')).toBeInTheDocument();
-        }, { timeout: 100 });
+        // Should revert to "Copy JSON"
+        expect(screen.getByText('Copy JSON')).toBeInTheDocument();
 
         vi.useRealTimers();
     });
@@ -133,7 +134,7 @@ describe('DebugModal Component', () => {
 
         expect(preElement).toBeInTheDocument();
         expect(preElement.textContent).toContain('"tick": 1');
-        expect(preElement.textContent).toContain('"message": "Test log 1"');
+        expect(preElement.textContent).toContain('"summary": "Test log 1"');
     });
 
     // TC.UI.13: DebugModal Entry Count

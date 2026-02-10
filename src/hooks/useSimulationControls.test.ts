@@ -83,7 +83,8 @@ describe('useSimulationControls Hook', () => {
         expect(newState).toHaveProperty('elevators');
         expect(newState).toHaveProperty('pendingRequests');
         expect(newState).toHaveProperty('activeRequests');
-        expect(newState.tick).toBe(0);
+        expect(newState.clockTick).toBe(0);
+        expect(newState.running).toBe(false);
     });
 
     // TC.HOOK.10: useSimulationControls Config Change
@@ -107,7 +108,7 @@ describe('useSimulationControls Hook', () => {
 
         // Verify setState was called with a new initial state
         const newState = setState.mock.calls[0][0];
-        expect(newState.tick).toBe(0);
+        expect(newState.clockTick).toBe(0);
     });
 
     // TC.HOOK.11: useSimulationControls Tick Loop
@@ -164,8 +165,9 @@ describe('useSimulationControls Hook', () => {
     });
 
     it('should recreate interval when tickDurationMs changes', () => {
+        const runningState = { ...state, running: true };
         const { rerender } = renderHook(
-            ({ config }) => useSimulationControls({ config, state, setState, setConfig }),
+            ({ config }) => useSimulationControls({ config, state: runningState, setState, setConfig }),
             { initialProps: { config: DEFAULT_CONFIG } }
         );
 

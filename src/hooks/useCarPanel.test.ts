@@ -86,7 +86,7 @@ describe('useCarPanel Hook', () => {
     });
 
     // TC.HOOK.05: useCarPanel Auto-Close
-    it('TC.HOOK.05: should auto-close panel after 2 seconds when car call is made', async () => {
+    it('TC.HOOK.05: should auto-close panel after 2 seconds when car call is made', () => {
         const { result } = renderHook(() => useCarPanel({ setState }));
 
         act(() => {
@@ -108,9 +108,7 @@ describe('useCarPanel Hook', () => {
         });
 
         // Panel should now be closed
-        await waitFor(() => {
-            expect(result.current.carPanelElevatorId).toBeNull();
-        });
+        expect(result.current.carPanelElevatorId).toBeNull();
     });
 
     // TC.HOOK.06: useCarPanel Timeout Cleanup

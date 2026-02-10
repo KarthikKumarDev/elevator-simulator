@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:coverage": "vitest --coverage --run && node scripts/enhance-coverage-theme.js",
+    "test:coverage": "vitest --coverage --run && node scripts/enhance-coverage-theme.js && npm run test:report",
+    "test:report": "npx tsx generate-test-report.ts",
     "lint": "eslint src --ext ts,tsx --max-warnings=0"
   },
   "dependencies": {
