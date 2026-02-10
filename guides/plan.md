@@ -49,6 +49,22 @@ This section links to the detailed specifications for each component of the proj
       onToggle: () => void;
     }
     ```
+-   **Component Size Limit**: **No component file should exceed 150 lines**. This is a hard rule.
+    -   When approaching the limit, refactor into smaller components
+    -   Extract business logic into custom hooks
+    -   Move utility functions to separate modules
+    -   See `guides/coding_standards.md` for full details
+-   **Component Architecture**:
+    -   **Single Responsibility**: Each component should do one thing well
+    -   **Composition over Complexity**: Build complex UIs from simple, reusable components
+    -   **Extract Early**: Don't wait until hitting 150 lines - extract at ~100 lines
+    -   **Examples from this project**:
+        - `BuildingView` → `FloorControls`, `ElevatorShaft`, `ElevatorCar`
+        - `SimulationPage` → `SimulationHeader`, `useSimulationControls`, `useCarPanel`
+-   **Custom Hooks for Logic**:
+    -   Extract stateful logic into custom hooks (e.g., `useSimulationControls`, `useCarPanel`)
+    -   Hooks should manage related state and side effects
+    -   Makes business logic testable independent of UI
 -   **Memoization**: Use `useMemo` for expensive calculations (like derived metrics) and `useCallback` for event handlers passed to children to avoid unnecessary re-renders.
 -   **Styling**: Use standard CSS modules or styled-components (if configured). Keep styles co-located or modular. For this project, inline styles or simple CSS files are acceptable given the `ui_spec.md` emphasis on specific visual properties.
 
@@ -61,17 +77,32 @@ This section links to the detailed specifications for each component of the proj
 
 ## 4. Best Practices
 
+-   **Component Refactoring**:
+    -   **When to refactor**: Component exceeds 100 lines or has multiple responsibilities
+    -   **How to refactor**:
+        1. Identify logical sections (header, content, controls, etc.)
+        2. Extract one section at a time into a new component
+        3. Move business logic to custom hooks
+        4. Create utility modules for shared functions
+        5. Run tests after each extraction to ensure no regressions
+    -   **Refactoring checklist**:
+        - [ ] All tests still pass
+        - [ ] No duplicate code introduced
+        - [ ] Props interfaces are well-defined
+        - [ ] Component names are descriptive
+        - [ ] Documentation updated
 -   **Testing**:
     -   Write unit tests for *logic* (simulation engine) independent of UI.
     -   Test edge cases (e.g., 0 floors, empty queues, simultaneous requests).
 -   **Performance**:
-    -   The simulation loop can run frequently (e.g., 100ms). specific care must be taken to ensure the `tick` logic is O(N) or O(1), not O(N^2) where N is requests/elevators.
+    -   The simulation loop can run frequently (e.g., 100ms). Specific care must be taken to ensure the `tick` logic is O(N) or O(1), not O(N^2) where N is requests/elevators.
 -   **Accessibility (a11y)**:
     -   Ensure buttons have `aria-label` if they are icon-only.
     -   Use semantic HTML (`<button>`, `<main>`, `<header>`).
 -   **Code Quality**:
-    -   Keep components small (Single Responsibility Principle).
+    -   Keep components small (Single Responsibility Principle) - **Maximum 150 lines**.
     -   Comments should explain *why*, not *what*.
+    -   Follow the coding standards in `guides/coding_standards.md`.
 
 ---
 

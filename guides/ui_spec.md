@@ -272,41 +272,168 @@
 
 ## 5. Component Architecture
 
-### BuildingView Component
-- **Props**: state, maxFloor, tickDurationMs, event handlers
-- **Structure**:
-  - Floor controls column (left)
-  - Shafts container (right)
-  - Per-elevator: shaft, floor markers, car, doors, interior, popover
-- **State Management**: Controlled component, all state lifted to parent
+### Architecture Principles
 
-### ControlPanel Component
+#### Component Size Rule
+**HARD LIMIT: No component file may exceed 150 lines.**
+
+**Enforcement:**
+- Components approaching 100 lines should be evaluated for refactoring
+- At 150 lines, refactoring is mandatory
+- Test files are exempt but should be split if exceeding 300 lines
+
+**Refactoring Strategy:**
+1. **Identify logical sections** - Look for distinct UI areas or responsibilities
+2. **Extract one at a time** - Don't refactor everything at once
+3. **Test after each extraction** - Ensure no regressions
+4. **Update documentation** - Keep specs current
+
+#### Component Extraction Patterns
+
+**Pattern 1: UI Section Extraction**
+- Extract distinct visual sections into separate components
+- Example: `SimulationPage` → `SimulationHeader`
+- Each section becomes a focused, reusable component
+
+**Pattern 2: Repeated Elements**
+- Extract elements that render in loops
+- Example: `BuildingView` → `FloorControls` (one per floor)
+- Reduces duplication and improves maintainability
+
+**Pattern 3: Complex Sub-Components**
+- Extract complex nested structures
+- Example: `BuildingView` → `ElevatorShaft` → `ElevatorCar`
+- Creates clear component hierarchy
+
+**Pattern 4: Business Logic to Hooks**
+- Extract stateful logic into custom hooks
+- Example: `SimulationPage` → `useSimulationControls`, `useCarPanel`
+- Separates concerns and improves testability
+
+**Pattern 5: Utility Functions**
+- Move pure functions to utility modules
+- Example: `BuildingView` → `utils/elevatorColors.ts`
+- Enables reuse across components
+
+### Current Component Structure
+
+#### BuildingView Component (70 lines)
+- **Props**: state, maxFloor, tickDurationMs, event handlers
+- **Composition**:
+  - `FloorControls` (37 lines) - Floor label and hall buttons
+  - `ElevatorShaft` (47 lines) - Shaft container with floor markers
+    - `ElevatorCar` (90 lines) - Car visualization with doors and popover
+- **State Management**: Controlled component, all state lifted to parent
+- **Refactored from**: 162 lines (57% reduction)
+
+#### SimulationPage Component (107 lines)
+- **Props**: None (top-level page)
+- **Composition**:
+  - `SimulationHeader` (71 lines) - Title and action buttons
+  - `BuildingView` - Main visualization
+  - `ControlPanel` - Simulation controls
+  - `MetricsPanel` - Performance metrics
+  - `TravelLogPanel` - Detailed logs
+  - `DebugModal` - System debug logs
+- **Custom Hooks**:
+  - `useSimulationControls` (62 lines) - Tick loop and control handlers
+  - `useCarPanel` (41 lines) - Car panel state management
+- **State Management**: Local state with hooks
+- **Refactored from**: 208 lines (49% reduction)
+
+#### ControlPanel Component (111 lines)
 - **Props**: config, running state, event handlers
 - **Features**:
   - 2-column grid for inputs
   - Full-width mode selector
   - Start/Pause toggle button
   - Reset button
+- **Status**: ✅ Compliant (under 150 lines)
 
-### MetricsPanel Component
+#### MetricsPanel Component (33 lines)
 - **Props**: metrics object
 - **Display**: 3-column grid of metric cards
 - **Formatting**: Numbers with appropriate decimal places
+- **Status**: ✅ Compliant (under 150 lines)
 
-### TravelLogPanel Component
+#### TravelLogPanel Component (74 lines)
 - **Props**: elevators array, travelLog object, tickDurationMs
 - **Features**:
   - Dynamic grid based on elevator count
   - Per-elevator stats (moving time, power, sequence)
   - Overall system summary (total time in minutes, total power)
+- **Status**: ✅ Compliant (under 150 lines)
 
-### DebugModal Component
+#### DebugModal Component (118 lines)
 - **Props**: isOpen, onClose, logs array
 - **Features**:
   - Copy to clipboard functionality
   - Pretty-printed JSON display
   - Entry count footer
   - Click outside to close (overlay click)
+- **Status**: ✅ Compliant (under 150 lines)
+
+#### SimulationHeader Component (71 lines)
+- **Props**: onDebugClick, onTestsClick, onGuidesClick
+- **Features**:
+  - Application title and subtitle
+  - Debug button (yellow-tinted)
+  - Tests navigation button
+  - Guides navigation button
+- **Status**: ✅ Compliant (under 150 lines)
+
+#### FloorControls Component (37 lines)
+- **Props**: floor, maxFloor, state, onHallCall
+- **Features**:
+  - Floor label display
+  - UP hall call button (disabled on top floor)
+  - DOWN hall call button (disabled on floor 1)
+  - Active state highlighting
+- **Status**: ✅ Compliant (under 150 lines)
+
+#### ElevatorShaft Component (47 lines)
+- **Props**: elevator, floors, maxFloor, tickDurationMs, handlers
+- **Features**:
+  - Shaft container with floor markers
+  - Composes ElevatorCar component
+- **Status**: ✅ Compliant (under 150 lines)
+
+#### ElevatorCar Component (90 lines)
+- **Props**: elevator, maxFloor, tickDurationMs, isPopoverOpen, interiorColor, handlers
+- **Features**:
+  - Elevator header with ID and direction
+  - Cabin with doors and interior
+  - Door animations (open/close)
+  - Car panel popover for floor selection
+  - Hover behavior support
+- **Status**: ✅ Compliant (under 150 lines)
+
+### Custom Hooks
+
+#### useSimulationControls (62 lines)
+- **Purpose**: Manages simulation tick loop and control handlers
+- **Returns**: handleStart, handlePause, handleReset, handleConfigChange
+- **Features**:
+  - Interval-based tick loop
+  - Ref-based state tracking to avoid interval recreation
+  - Immutable state updates
+- **Status**: ✅ Compliant (under 150 lines)
+
+#### useCarPanel (41 lines)
+- **Purpose**: Manages car panel state and interactions
+- **Returns**: carPanelElevatorId, handleOpenCarPanel, closeCarPanel, handleCarCall
+- **Features**:
+  - Car panel open/close state
+  - Auto-close timeout (2 seconds)
+  - Car call request handling
+- **Status**: ✅ Compliant (under 150 lines)
+
+### Utility Modules
+
+#### elevatorColors.ts (13 lines)
+- **Purpose**: Generate and cache random interior colors for elevators
+- **Exports**: getElevatorColor(id: string)
+- **Algorithm**: HSL-based dark color generation (hue: 0-360°, saturation: 30-50%, lightness: 15-25%)
 
 ## 6. Responsive Design
 - **Breakpoint**: 900px
@@ -350,3 +477,57 @@
 - **Dark/Light Mode Toggle**: Theme switching
 - **Advanced Metrics**: Charts and graphs for performance over time
 - **Export Functionality**: CSV/JSON export of metrics and logs
+
+## 10. Component Architecture Summary
+
+### Compliance Status
+**🎉 100% of components comply with the 150-line limit!**
+
+| Component/Module | Lines | Type | Status |
+|------------------|-------|------|--------|
+| DebugModal | 118 | Component | ✅ Compliant |
+| ControlPanel | 111 | Component | ✅ Compliant |
+| SimulationPage | 107 | Page | ✅ Refactored |
+| ElevatorCar | 90 | Component | ✅ Compliant |
+| TravelLogPanel | 74 | Component | ✅ Compliant |
+| SimulationHeader | 71 | Component | ✅ New |
+| BuildingView | 70 | Component | ✅ Refactored |
+| useSimulationControls | 62 | Hook | ✅ New |
+| ElevatorShaft | 47 | Component | ✅ New |
+| useCarPanel | 41 | Hook | ✅ New |
+| FloorControls | 37 | Component | ✅ New |
+| MetricsPanel | 33 | Component | ✅ Compliant |
+| elevatorColors | 13 | Utility | ✅ New |
+
+### Refactoring Achievements
+- **Components refactored**: 2 (BuildingView, SimulationPage)
+- **New components created**: 4 (FloorControls, ElevatorShaft, ElevatorCar, SimulationHeader)
+- **Custom hooks extracted**: 2 (useSimulationControls, useCarPanel)
+- **Utility modules created**: 1 (elevatorColors)
+- **Average file size reduction**: 53%
+- **Tests passing**: 37/37 ✅
+
+### Architectural Benefits
+1. ✅ **Modularity**: Each component has a single, clear responsibility
+2. ✅ **Reusability**: Extracted components can be used in different contexts
+3. ✅ **Testability**: Smaller components and hooks are easier to test
+4. ✅ **Maintainability**: Easier to understand, modify, and debug
+5. ✅ **Performance**: Smaller components can be optimized with React.memo
+6. ✅ **Scalability**: Clear patterns for future component development
+
+### Component Hierarchy
+```
+App
+├── SimulationPage
+│   ├── SimulationHeader
+│   ├── BuildingView
+│   │   ├── FloorControls (×N floors)
+│   │   └── ElevatorShaft (×N elevators)
+│   │       └── ElevatorCar
+│   ├── ControlPanel
+│   ├── MetricsPanel
+│   ├── TravelLogPanel
+│   └── DebugModal
+├── TestsPage
+└── GuidesPage
+```
