@@ -10,58 +10,54 @@ This document tracks components that violate the 150-line limit and need to be r
 
 ## Components Requiring Refactoring
 
-### 1. SimulationPage.tsx (208 lines) - HIGH PRIORITY
-**Current Size**: 208 lines  
-**Target**: < 150 lines  
-**Status**: 🔴 Needs Refactoring
+### 1. SimulationPage.tsx - ✅ COMPLETED
+**Original Size**: 208 lines  
+**New Size**: 107 lines  
+**Status**: ✅ Refactored (2026-02-10)
 
-**Proposed Refactoring**:
-- Extract header section into `SimulationHeader.tsx` component
+**Refactoring Completed**:
+- ✅ Extracted `SimulationHeader.tsx` component (71 lines)
   - Contains: Title, subtitle, Debug/Tests/Guides buttons
-  - Estimated: ~30 lines
-- Extract simulation controls logic into custom hook `useSimulationControls.ts`
-  - Contains: handleStart, handlePause, handleReset, handleConfigChange
-  - Estimated: ~20 lines
-- Extract car panel management into custom hook `useCarPanel.ts`
-  - Contains: carPanelElevatorId state, handleOpenCarPanel, closeCarPanel, handleCarCall
-  - Estimated: ~25 lines
-- Remaining `SimulationPage.tsx`: Main layout and component composition
-  - Estimated: ~130 lines
+- ✅ Created `useSimulationControls.ts` custom hook (60 lines)
+  - Contains: Simulation tick logic, start/pause/reset/config handlers
+- ✅ Created `useCarPanel.ts` custom hook (40 lines)
+  - Contains: Car panel state, open/close/call handlers with timeout
+- ✅ Simplified `SimulationPage.tsx` to 107 lines (main layout and composition)
 
-**Benefits**:
+**Benefits Achieved**:
 - Clearer separation of concerns
 - Reusable header component
 - Testable hooks for business logic
 - Easier to understand main page flow
+- **49% reduction in file size**
 
 ---
 
-### 2. BuildingView.tsx (162 lines) - MEDIUM PRIORITY
-**Current Size**: 162 lines  
-**Target**: < 150 lines  
-**Status**: 🟡 Needs Refactoring
+### 2. BuildingView.tsx - ✅ COMPLETED
+**Original Size**: 162 lines  
+**New Size**: 70 lines  
+**Status**: ✅ Refactored (2026-02-10)
 
-**Proposed Refactoring**:
-- Extract floor controls into `FloorControls.tsx` component
+**Refactoring Completed**:
+- ✅ Extracted `FloorControls.tsx` component (37 lines)
   - Contains: Floor label and hall call buttons for a single floor
-  - Props: floor, maxFloor, isUpActive, isDownActive, onHallCall
-  - Estimated: ~30 lines
-- Extract elevator shaft into `ElevatorShaft.tsx` component
-  - Contains: Shaft container, floor markers, single elevator car
-  - Props: elevator, maxFloor, tickDurationMs, handlers
-  - Estimated: ~60 lines
-- Extract elevator car into `ElevatorCar.tsx` component (nested in shaft)
-  - Contains: Header, cabin, doors, interior, car panel
+  - Props: floor, maxFloor, state, onHallCall
+- ✅ Extracted `ElevatorShaft.tsx` component (47 lines)
+  - Contains: Shaft container, floor markers, elevator car composition
+  - Props: elevator, floors, maxFloor, tickDurationMs, handlers
+- ✅ Extracted `ElevatorCar.tsx` component (90 lines)
+  - Contains: Header, cabin, doors, interior, car panel popover
   - Props: elevator, maxFloor, tickDurationMs, isPopoverOpen, handlers
-  - Estimated: ~50 lines
-- Remaining `BuildingView.tsx`: Main container layout
-  - Estimated: ~40 lines
+- ✅ Created `utils/elevatorColors.ts` utility (13 lines)
+  - Contains: Elevator color generation and caching logic
+- ✅ Simplified `BuildingView.tsx` to 70 lines (main container layout)
 
-**Benefits**:
+**Benefits Achieved**:
 - Each component has a single responsibility
 - Easier to test individual elevator behavior
-- Floor controls can be reused or modified independently
+- Floor controls are reusable and independent
 - Improved code readability
+- **57% reduction in file size**
 
 ---
 
@@ -81,7 +77,27 @@ This document tracks components that violate the 150-line limit and need to be r
 
 ## Completed Refactorings
 
-_None yet_
+### ✅ SimulationPage.tsx (Completed: 2026-02-10)
+- **Before**: 208 lines
+- **After**: 107 lines
+- **Reduction**: 49%
+- **New Components**: SimulationHeader.tsx (71 lines)
+- **New Hooks**: useSimulationControls.ts (60 lines), useCarPanel.ts (40 lines)
+
+### ✅ BuildingView.tsx (Completed: 2026-02-10)
+- **Before**: 162 lines
+- **After**: 70 lines
+- **Reduction**: 57%
+- **New Components**: FloorControls.tsx (37 lines), ElevatorShaft.tsx (47 lines), ElevatorCar.tsx (90 lines)
+- **New Utilities**: elevatorColors.ts (13 lines)
+
+**Overall Impact**:
+- 2 components refactored
+- 4 new reusable components created
+- 2 custom hooks extracted
+- 1 utility module created
+- **All 37 tests passing** ✅
+- Average file size reduction: **53%**
 
 ---
 
@@ -109,11 +125,13 @@ _None yet_
 
 ## Timeline
 
-**Target Completion**: TBD
+**Target Completion**: ✅ COMPLETED (2026-02-10)
 
-**Priority Order**:
-1. SimulationPage.tsx (highest impact, most complex)
-2. BuildingView.tsx (core visualization component)
+**Completed Tasks**:
+1. ✅ SimulationPage.tsx - Refactored successfully
+2. ✅ BuildingView.tsx - Refactored successfully
+
+**All components now comply with the 150-line limit!**
 
 ---
 
