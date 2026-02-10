@@ -133,3 +133,168 @@ This section outlines the high-level approach to testing the application.
 - Observe behavior when rapidly spamming calls.
 - Validate that metrics appear reasonable and consistent with expectations.
 
+
+### M. UI Component Coverage (TC.UI.08 - TC.UI.32)
+**Target: 100% coverage for all UI components**
+
+#### DebugModal Component (Currently 27% coverage)
+- **TC.UI.08**: DebugModal Rendering - Verify modal renders when isOpen=true
+- **TC.UI.09**: DebugModal Close - Verify onClose callback is called when close button clicked
+- **TC.UI.10**: DebugModal Copy - Verify copy button copies logs to clipboard
+- **TC.UI.11**: DebugModal Copy Feedback - Verify "Copied!" state appears and reverts after 2 seconds
+- **TC.UI.12**: DebugModal Logs Display - Verify logs are displayed as formatted JSON
+- **TC.UI.13**: DebugModal Entry Count - Verify entry count footer displays correct number
+
+#### ElevatorCar Component (Currently 31% coverage)
+- **TC.UI.14**: ElevatorCar Rendering - Verify car renders with correct ID and direction symbol
+- **TC.UI.15**: ElevatorCar Position - Verify translateY calculation based on currentFloor
+- **TC.UI.16**: ElevatorCar Doors - Verify door classes change based on doorState
+- **TC.UI.17**: ElevatorCar Interior - Verify interior color is applied
+- **TC.UI.18**: ElevatorCar Select Button - Verify "Select" button appears when doors open
+- **TC.UI.19**: ElevatorCar Popover - Verify car panel popover opens when Select clicked
+- **TC.UI.20**: ElevatorCar Floor Selection - Verify clicking floor in popover calls onCarCall
+- **TC.UI.21**: ElevatorCar Active Floors - Verify active floors are highlighted in popover
+- **TC.UI.22**: ElevatorCar Disabled Current - Verify current floor button is disabled
+- **TC.UI.23**: ElevatorCar Hover - Verify onElevatorHover called on mouse enter/leave
+
+#### FloorControls Component (Currently 33% coverage)
+- **TC.UI.24**: FloorControls Rendering - Verify floor label and buttons render
+- **TC.UI.25**: FloorControls UP Button - Verify UP button calls onHallCall with 'up'
+- **TC.UI.26**: FloorControls DOWN Button - Verify DOWN button calls onHallCall with 'down'
+- **TC.UI.27**: FloorControls Active State - Verify active class applied when request pending
+- **TC.UI.28**: FloorControls Disabled Top - Verify UP button disabled on top floor
+- **TC.UI.29**: FloorControls Disabled Bottom - Verify DOWN button disabled on floor 1
+
+#### ControlPanel Component (Currently 86% coverage)
+- **TC.UI.30**: ControlPanel Mode Change - Verify mode selector calls onConfigChange
+- **TC.UI.31**: ControlPanel Input Validation - Verify floor/elevator inputs enforce min/max
+- **TC.UI.32**: ControlPanel Edge Cases - Test all input combinations
+
+### N. Custom Hooks Coverage (TC.HOOK.01 - TC.HOOK.12)
+**Target: 100% coverage for all custom hooks**
+
+#### useCarPanel Hook (Currently 30% coverage)
+- **TC.HOOK.01**: useCarPanel Open - Verify handleOpenCarPanel sets elevatorId
+- **TC.HOOK.02**: useCarPanel Close - Verify closeCarPanel clears elevatorId
+- **TC.HOOK.03**: useCarPanel Timeout Clear - Verify timeout is cleared on open
+- **TC.HOOK.04**: useCarPanel Car Call - Verify handleCarCall toggles request
+- **TC.HOOK.05**: useCarPanel Auto-Close - Verify panel auto-closes after 2 seconds
+- **TC.HOOK.06**: useCarPanel Timeout Cleanup - Verify timeout cleared on close
+
+#### useSimulationControls Hook (Currently 75% coverage)
+- **TC.HOOK.07**: useSimulationControls Start - Verify handleStart sets running=true
+- **TC.HOOK.08**: useSimulationControls Pause - Verify handlePause sets running=false
+- **TC.HOOK.09**: useSimulationControls Reset - Verify handleReset creates initial state
+- **TC.HOOK.10**: useSimulationControls Config Change - Verify handleConfigChange updates config and resets
+- **TC.HOOK.11**: useSimulationControls Tick Loop - Verify interval calls tickSimulation
+- **TC.HOOK.12**: useSimulationControls Interval Cleanup - Verify interval cleared on unmount
+
+### O. Page Component Coverage (TC.PAGE.01 - TC.PAGE.10)
+**Target: 100% coverage for all page components**
+
+#### SimulationPage (Currently 67% coverage)
+- **TC.PAGE.01**: SimulationPage Rendering - Verify all sections render
+- **TC.PAGE.02**: SimulationPage Debug Modal - Verify debug button opens modal
+- **TC.PAGE.03**: SimulationPage Navigation - Verify Tests/Guides buttons navigate
+- **TC.PAGE.04**: SimulationPage Hall Call - Verify handleHallCall adds request
+- **TC.PAGE.05**: SimulationPage Elevator Hover - Verify handleElevatorHover updates state
+
+#### GuidesPage (Currently 91% coverage)
+- **TC.PAGE.06**: GuidesPage All Guides - Verify all guide links render and navigate
+- **TC.PAGE.07**: GuidesPage Back Button - Verify back to simulation navigation
+
+#### TestsPage (Currently 0% coverage)
+- **TC.PAGE.08**: TestsPage Rendering - Verify test results iframe renders
+- **TC.PAGE.09**: TestsPage Coverage Link - Verify coverage report link works
+- **TC.PAGE.10**: TestsPage Back Button - Verify back to simulation navigation
+
+### P. Simulation Logic Edge Cases (TC.SIM.51 - TC.SIM.65)
+**Target: 100% coverage for simulation.ts (Currently 90%)**
+
+#### Uncovered Lines in simulation.ts
+- **TC.SIM.51**: Multiple Requests Same Floor - Both UP and DOWN at same floor, different elevators
+- **TC.SIM.52**: Elevator at Destination - Elevator already at target floor when request added
+- **TC.SIM.53**: Door State Transitions - All door state transitions (closed→opening→open→closing→closed)
+- **TC.SIM.54**: Hover During Closing - Set hover while doors are closing
+- **TC.SIM.55**: Unhover During Open - Remove hover while doors are open
+- **TC.SIM.56**: Request Completion Edge - Request completed exactly when elevator arrives
+- **TC.SIM.57**: Power Mode Jump Boundary - Jump exactly 2 floors in power mode
+- **TC.SIM.58**: Eco Mode Batching - Multiple requests batched to single elevator
+- **TC.SIM.59**: Normal Mode Dual Dispatch - Dual-direction dispatch with exactly 2 idle elevators
+- **TC.SIM.60**: Normal Mode Dual Skip - Dual-direction dispatch skipped with <2 idle elevators
+- **TC.SIM.61**: Direction Change - Elevator changes direction after completing all targets
+- **TC.SIM.62**: Empty Target Floors - Elevator with empty targetFloors array
+- **TC.SIM.63**: Request at Current Floor - Hall request at elevator's current floor
+- **TC.SIM.64**: Piggybacking Edge - Request added exactly at elevator's next target
+- **TC.SIM.65**: System Log Entries - Verify all system log types are generated
+
+### Q. Integration & Refactored Components (TC.INT.05 - TC.INT.10)
+**Target: Test component composition and hook integration**
+
+- **TC.INT.05**: BuildingView Composition - Verify FloorControls and ElevatorShaft render correctly
+- **TC.INT.06**: ElevatorShaft Composition - Verify ElevatorCar renders within shaft
+- **TC.INT.07**: SimulationHeader Integration - Verify all buttons trigger correct callbacks
+- **TC.INT.08**: Hook State Sync - Verify useCarPanel state syncs with SimulationPage
+- **TC.INT.09**: Hook Effect Cleanup - Verify useSimulationControls cleans up interval
+- **TC.INT.10**: Color Utility - Verify elevatorColors generates consistent colors
+
+## 5. Coverage Goals & Tracking
+
+### Coverage Targets
+**Goal: 100% code coverage across all modules**
+
+| Module | Current | Target | Gap | Priority |
+|--------|---------|--------|-----|----------|
+| simulation.ts | 90% | 100% | 10% | HIGH |
+| Components | 62% | 100% | 38% | HIGH |
+| Hooks | 55% | 100% | 45% | HIGH |
+| Pages | 70% | 100% | 30% | MEDIUM |
+| Utils | 100% | 100% | 0% | ✅ DONE |
+| **Overall** | **81%** | **100%** | **19%** | **HIGH** |
+
+### Test Implementation Priority
+
+**Phase 1: Critical Coverage Gaps (HIGH PRIORITY)**
+1. UI Components (TC.UI.08-32) - 25 test cases
+2. Custom Hooks (TC.HOOK.01-12) - 12 test cases
+3. Simulation Edge Cases (TC.SIM.51-65) - 15 test cases
+
+**Phase 2: Page Components (MEDIUM PRIORITY)**
+4. TestsPage (TC.PAGE.08-10) - 3 test cases
+5. SimulationPage gaps (TC.PAGE.01-05) - 5 test cases
+6. GuidesPage gaps (TC.PAGE.06-07) - 2 test cases
+
+**Phase 3: Integration & Polish (LOW PRIORITY)**
+7. Component Composition (TC.INT.05-10) - 6 test cases
+8. Performance Tests (TC.PERF.01-02) - 2 test cases
+
+**Total New Test Cases: 70**
+
+### Success Criteria
+- ✅ All test suites pass (37/37 currently passing)
+- ✅ 100% line coverage (currently 84%)
+- ✅ 100% branch coverage (currently 66%)
+- ✅ 100% function coverage (currently 68%)
+- ✅ 100% statement coverage (currently 81%)
+- ✅ No untested code paths
+- ✅ All edge cases documented and tested
+- ✅ All refactored components fully tested
+
+### Coverage Improvement Roadmap
+
+**Week 1: UI Components**
+- Implement TC.UI.08-13 (DebugModal) - Expected +5% coverage
+- Implement TC.UI.14-23 (ElevatorCar) - Expected +8% coverage
+- Implement TC.UI.24-29 (FloorControls) - Expected +4% coverage
+- **Target: 98% component coverage**
+
+**Week 2: Hooks & Pages**
+- Implement TC.HOOK.01-12 (Hooks) - Expected +6% coverage
+- Implement TC.PAGE.01-10 (Pages) - Expected +4% coverage
+- **Target: 95% overall coverage**
+
+**Week 3: Edge Cases & Integration**
+- Implement TC.SIM.51-65 (Simulation) - Expected +3% coverage
+- Implement TC.INT.05-10 (Integration) - Expected +2% coverage
+- **Target: 100% overall coverage**
+
