@@ -208,6 +208,12 @@ function generateHTML(summary: TestSummary, testCodeMap: Record<string, string>)
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stats-group {
+      display: flex;
       align-items: center;
       gap: 3rem;
     }
@@ -237,6 +243,8 @@ function generateHTML(summary: TestSummary, testCodeMap: Record<string, string>)
       height: 24px;
       background: var(--border);
     }
+
+
 
     /* Category Headers */
     .test-category {
@@ -411,27 +419,31 @@ function generateHTML(summary: TestSummary, testCodeMap: Record<string, string>)
   </style>
 </head>
 <body>
+
   <div class="container">
     <div class="stats-header">
-      <div class="stat-item">
-        <span>Total Tests</span>
-        <span class="stat-value">${summary.total}</span>
+      <div class="stats-group">
+        <div class="stat-item">
+          <span>Total Tests</span>
+          <span class="stat-value">${summary.total}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item passed">
+          <span>Passed</span>
+          <span class="stat-value">${summary.passed}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item failed">
+          <span>Failed</span>
+          <span class="stat-value">${summary.failed}</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item duration">
+          <span>Duration</span>
+          <span class="stat-value">${(summary.duration / 1000).toFixed(2)}s</span>
+        </div>
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item passed">
-        <span>Passed</span>
-        <span class="stat-value">${summary.passed}</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item failed">
-        <span>Failed</span>
-        <span class="stat-value">${summary.failed}</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item duration">
-        <span>Duration</span>
-        <span class="stat-value">${(summary.duration / 1000).toFixed(2)}s</span>
-      </div>
+      
     </div>
 
     ${Object.entries(testsByFile).map(([category, tests]) => `
