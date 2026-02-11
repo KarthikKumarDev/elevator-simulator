@@ -62,13 +62,20 @@ The following specifications are the source of truth for this phase:
 **Goal**: Define HOW we will build the system to ensure scalability and maintainability.
 
 ### 2.1 Key Activities
+*   **Functional Spec Generation**: Create detailed specs for each feature.
+    *   **Output**: `[feature_name]_functional_spec.md`.
+    *   **Structure**:
+        1.  **User Stories**: As a [role], I want [feature] so that [benefit].
+        2.  **Acceptance Criteria**: Exact conditions for "Done" (Given/When/Then).
+        3.  **Visual Requirements**: Wireframes or reference to UI Spec.
+        4.  **Edge Cases**: Zero state, Error state, Max limits.
 *   **Algorithm Design**: Structure the core logic (e.g., dispatching, data processing).
     *   **Output**: `[name]_algo_spec.md` containing pseudocode, time complexity analysis (Big O), and edge case handling.
 *   **High-Level Design (HLD)**: Define system components and data flow.
     *   **Output**: `system_design.md` containing Component Diagrams (Mermaid.js), Sequence Diagrams for critical paths, and API contracts.
 *   **Tool Recommendations**: Select the right tools for the job.
-    *   **Criteria**: Evaluate libraries based on bundle size, community support, and TS compatibility.
-    *   **Output**: `tech_stack.md` (or dedicated section in Design Doc) listing dependencies with justification.
+    *   **Criteria**: Evaluate libraries based on size, community support, and compatibility.
+    *   **Output**: List dependencies with justification.
 
 ### 2.2 Design Architecture & File Standards
 | Plan Type | Standard Filename | Content Requirements |
@@ -82,17 +89,17 @@ The following specifications are the source of truth for this phase:
 
 ### 2.3 Architectural Rules
 1.  **Strict Separation of Concerns**:
-    *   **UI Layer** (`src/components/`, `src/pages/`): Strictly *renders state* and dispatches *actions*. No simulation logic.
-    *   **Simulation Engine** (`src/simulation.ts`): A pure function/module taking state + inputs -> new state. No UI dependencies.
-    *   **Types** (`src/types.ts`): Shared but minimal definitions.
+    *   **UI Layer**: Strictly *renders state* and dispatches *actions*. No business logic.
+    *   **Core Logic**: A pure function/module taking state + inputs -> new state. No UI dependencies.
+    *   **Data Models**: Shared but minimal definitions.
 2.  **State Management**:
-    *   Single source of truth passed down to components.
+    *   Single source of truth.
     *   State updates must be immutable.
-3.  **Tick-Based Simulation**:
-    *   All logic updates occur in a central `tick()` function (O(N) or O(1) complexity).
-    *   UI re-renders purely as a reaction to the state change from `tick()`.
+3.  **Core Loop**:
+    *   All logic updates occur in a central processing function.
+    *   UI re-renders purely as a reaction to state changes.
 4.  **Configuration**:
-    *   No "Magic Numbers". All parameters (floors, speeds) must be in a config object.
+    *   No "Magic Numbers". All parameters must be in a config object.
 
 ---
 
@@ -100,43 +107,73 @@ The following specifications are the source of truth for this phase:
 **Goal**: Build the system according to the design specifications.
 
 ### 3.1 Workflow
-1.  **Plan**: Update relevant specs (`plan.md`, `ui_spec.md`) before coding.
-2.  **Review**: Wait for user approval.
-3.  **Implement**: Write code matching the plan.
-4.  **Verify**: Run tests (`npx vitest`) **ONLY** after code changes.
+1.  **Documentation**: Generate a `[feature_name]_tech_doc.md` before coding.
+    *   **Structure**: Overview, Schema Changes, API Contract, Algorithm details, and Edge Cases.
+2.  **Context**: Read and understand the specific spec (`*_spec.md`) and the new tech doc.
+3.  **Options**: Propose multiple implementation approaches to the User.
+4.  **Select**: Wait for User guidance.
+5.  **Implement**: Write code according to selection and standards.
+6.  **Verify**: Run relevant tests.
 
-### 3.2 Coding Guidelines (React + TypeScript)
+### 3.3 Backend Engineering Guidelines
+*   **API Definitions**:
+    *   **Specification**: Define strict **OpenAPI 3.0** specs as `.json` files before implementation.
+    *   **Versioning**: Use semantic versioning (e.g., `/api/v1/resource`) for all endpoints.
+*   **Service Configuration**:
+    *   Inject configuration via Environment Variables (`process.env`), never hardcode.
+    *   Validate config validation on startup (fail fast if missing).
+*   **Layered Architecture**:
+    *   **Controller Layer**: Handles HTTP parsing, validation, and response formatting only.
+    *   **Business Logic Layer (BLL)**: Contains core domain rules. Pure functions where possible.
+    *   **Resource Logic Layer (DAL)**: Handles database queries and external service calls.
+*   **Database Connections**:
+    *   Use connection pooling to manage resources efficiently.
+    *   Ensure strict schema validation (ORM or Validator) before writing.
+
+### 3.4 Coding Guidelines (General)
 *   **Component Architecture**:
-    *   **Size Limit**: **Standard max 150 lines**. Extract at ~100 lines.
-    *   **Functional Components**: Use hooks only. No class components.
-    *   **Strict Props**: Define interfaces for all props (`interface MyComponentProps`).
-    *   **Composition**: Build complex UIs from simple atoms (e.g., `BuildingView` -> `ElevatorShaft` -> `ElevatorCar`).
+    *   **Size Limit**: Enforce modules/components to be small (e.g., <150 lines). Extract early.
+    *   **Modern Practices**: Use modern language features (e.g., functional paradigms over classes where applicable).
+    *   **Strict Contracts**: Define clear interfaces for all modules and components.
+    *   **Composition**: Build complex UIs/Systems from simple, atomic units.
 *   **Business Logic**:
-    *   Extract stateful logic into Custom Hooks (e.g., `useSimulationControls`).
+    *   Extract stateful logic into dedicated helpers or services.
     *   Keep logic testable and independent of UI rendering.
-*   **TypeScript**:
-    *   **Strict Typing**: No `any`. Use `unknown` + narrowing if needed.
-    *   **Null Safety**: Use optional chaining (`?.`) and nullish coalescing (`??`).
+*   **Type Safety (If applicable)**:
+    *   **Strict Typing**: Avoid 'any' or loose types.
+    *   **Null Safety**: Handle null/undefined explicitly.
 *   **Styling**:
-    *   Follow `ui_spec.md` strictly (Glassmorphism).
-    *   Inline styles or CSS modules are acceptable.
+    *   Follow the defined `ui_spec.md` strictly.
+    *   Keep styles modular and maintainable.
 *   **Accessibility**:
-    *   Semantic HTML (`<button>`, `<main>`).
-    *   `aria-label` for icon-only buttons.
+    *   Use semantic elements/tags suitable for the platform.
+    *   Ensure interactive elements have accessible labels.
 
 ---
 
 ## Phase 4: Testing & Verification
 **Goal**: Ensure the system works as expected and meets quality standards.
 
-### 4.1 Testing Strategy
-*   **Unit Tests**: Verify `simulation.ts` logic against `test_plan.md` (Target: 100% Core Logic Coverage).
-*   **Component Tests**: Verify rendering and interaction using generic rules from `test_spec.md`.
-*   **Integration Tests**: Verify the full simulation loop in `App.tsx`.
-*   **Edge Cases**: Explicitly test 0 floors, empty queues, simultaneous requests.
+### 4.1 Test Plan Creation
+*   **Analysis**: Start by exhaustively analyzing the Functional Requirements (PRD), Algorithm Specs, and UI Specs.
+*   **Grouping**: accurate list of **all possible** test cases, grouped by:
+    *   **Module**: (e.g., Core Logic, API, UI Component).
+    *   **Type**: (e.g., Unit, Integration, Edge Case).
+*   **Output**: A comprehensive `test_plan.md` serving as the source of truth for verification.
 
-### 4.2 Verification Workflow
-*   Run `npm run test:coverage` to identify blind spots.
+### 4.2 Test Implementation
+*   **Generation**: Use `test_plan.md` to generate all unit and integration tests.
+*   **Modularization**: Create tests in properly modularized files (e.g., co-located `*.test.ts` or `tests/integration/`).
+*   **Traceability**: Ensure every generated test references the specific Test Case ID from the plan.
+
+### 4.3 Testing Strategy
+*   **Unit Tests**: Verify core logic against `test_plan.md` (Target: 100% Core Logic Coverage).
+*   **Component Tests**: Verify rendering and interaction using generic rules from `test_spec.md`.
+*   **Integration Tests**: Verify the full application loop.
+*   **Edge Cases**: Explicitly test boundary conditions (e.g., empty queues, simultaneous requests).
+
+### 4.4 Verification Workflow
+*   Run the test suite to identify blind spots.
 *   Ensure test descriptions map back to Test Cases (e.g., "TC14: ...").
 
 ---
@@ -145,8 +182,8 @@ The following specifications are the source of truth for this phase:
 **Goal**: Make the application available for use.
 
 ### 5.1 Artifact Generation
-*   **Build**: Use `vite build` to create optimized static assets.
-*   **Reports**: Generate HTML test reports (`test-report/index.html`) and coverage summaries.
+*   **Build**: Create optimized assets for the target platform.
+*   **Reports**: Generate test reports and coverage summaries.
 
 ### 5.2 Delivery Checklist
 *   [ ] Application builds without errors.
@@ -163,8 +200,8 @@ The following specifications are the source of truth for this phase:
 *   **Trigger**: Component exceeds 100 lines or has mixed responsibilities.
 *   **Process**:
     1.  Identify logical sections.
-    2.  Extract section to new component.
-    3.  Move logic to custom hooks.
+    2.  Extract section to new component/module.
+    3.  Move logic to dedicated handlers.
     4.  Verify with tests.
 *   **Checklist**:
     *   [ ] No regressions (Tests pass).
