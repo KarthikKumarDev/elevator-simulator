@@ -62,7 +62,13 @@ The following specifications are the source of truth for this phase:
 **Goal**: Define HOW we will build the system to ensure scalability and maintainability.
 
 ### 2.1 Key Activities
-*   **Functional Spec Generation**: Create detailed specs for each feature.
+*   **Functional Spec Planning**: Generate a high-level plan for requirements.
+    *   **Output**: `functional_spec_plan.md`.
+    *   **Content**:
+        *   List of all Product Features (Functional Requirements).
+        *   List of Non-Functional Requirements (Performance, Security).
+        *   Prioritization of features for specifications.
+*   **Functional Spec Generation**: Create detailed specs for each feature (based on the plan).
     *   **Output**: `[feature_name]_functional_spec.md`.
     *   **Structure**:
         1.  **User Stories**: As a [role], I want [feature] so that [benefit].
