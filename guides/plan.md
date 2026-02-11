@@ -1,114 +1,177 @@
-# Development Plan
+# Project Development Plan (SDLC)
 
-## 1. Documentation Map
-This section links to the detailed specifications for each component of the project.
+This document outlines the systematic approach to developing, testing, and maintaining the Elevator Simulator project, organized by the Software Development Life Cycle (SDLC) phases.
+
+---
+
+## Phase 1: Planning & Analysis
+**Goal**: Define WHAT we are building and ensure a clear understanding of requirements before writing code.
+
+### 1.1 Planning Architecture & File Standards
+To maintain a structured development process, distinct aspects of the system must be planned in separate files using standard naming conventions.
+
+| Plan Type | Standard Filename | Content Requirements |
+| :--- | :--- | :--- |
+### 1.2 LLM-Optimized Spec Writing Guidelines
+All component specifications (`*_spec.md`) must be written to be unambiguous and directly actionable by LLM agents.
+
+**A. Philosophy**
+Treat specifications as **strict, zero-shot prompts**. If a spec requires the agent to "guess" or "infer" business logic, the spec is defective.
+
+**B. Mandatory Specification Structure**
+Every spec file must include:
+1.  **Context & Scope**: A 1-2 sentence summary of *why* this exists.
+2.  **Data Models (The "What")**:
+    *   Strict **TypeScript Interfaces** or **JSON Schemas**.
+    *   *Rule*: Never describe data structures in prose if they can be defined in code.
+3.  **Core Logic (The "How")**:
+    *   **Pseudocode**: For any algorithm, provide Python/TS-like pseudocode.
+    *   **State Machines**: Use tables defining `(Current State) + (Event) -> (New State)`.
+4.  **Invariants & Constraints**:
+    *   Performance limits (e.g., "O(1) lookup required").
+    *   System boundaries (e.g., "Must not access DOM directly").
+5.  **Edge Cases**: Explicit list of Null/Empty/Error states and required handling.
+
+**C. Formatting Rules**
+*   **Keywords**: Use RFC 2119 terms (**MUST**, **MUST NOT**, **SHOULD**) to denote strictness.
+*   **No Ambiguity**: Avoid words like "usually", "approximately", or "better". Be binary.
+*   **Self-Contained**: Minimize external link references. If context is needed, include it briefly.
+
+**D. Active Validation & Clarification**
+*   **Test Assumptions**: Before finalizing a spec, explicitly list any assumptions made.
+*   **Ask for Clarity**: If a requirement is vague (e.g., "fast response"), **ASK** the user for a specific metric (e.g., "<200ms").
+*   **Decision Points**: Highlight trade-offs and ask for user preference on key architectural decisions.
+
+### 1.3 Key Activities
+*   **Requirements Gathering**: Defining core functionality (Business logic, System goals).
+*   **UI/UX Definition**: Establishing the visual style, layout, and user interactions.
+*   **Test Strategy**: Defining success criteria, coverage goals, and test cases early.
+
+### 1.4 Documentation Map
+The following specifications are the source of truth for this phase:
 
 | Document | Description |
 | :--- | :--- |
-| **[Functional Requirements](./prd.md)** | Defines *what* the system should do (Goals, Scope, FRs, NFRs). |
-| **[UI Specification](./ui_spec.md)** | Defines *how* the system should look (Layout, Styling, Interactions). |
-| **[Simulation Logic](./elevator_simulation_spec.md)** | Defines the core algorithms (Dispatching, Movement, Modes). |
-| **[Test Plan](./test_plan.md)** | Defines specific test scenarios and strategy (Unit, Integration, E2E). |
+| **[Functional Requirements](./prd.md)** | Goals, Scope, Functional & Non-Functional Requirements. |
+| **[UI Specification](./ui_spec.md)** | Layout, Styling Rules, and Interactions. |
+| **[Test Plan](./test_plan.md)** | Specific test scenarios, coverage goals, and strategy. |
 
 ---
 
-## 2. Implementation Rules
+## Phase 2: Design & Architecture
+**Goal**: Define HOW we will build the system to ensure scalability and maintainability.
 
+### 2.1 Key Activities
+*   **Algorithm Design**: Structure the core logic (e.g., dispatching, data processing).
+    *   **Output**: `[name]_algo_spec.md` containing pseudocode, time complexity analysis (Big O), and edge case handling.
+*   **High-Level Design (HLD)**: Define system components and data flow.
+    *   **Output**: `system_design.md` containing Component Diagrams (Mermaid.js), Sequence Diagrams for critical paths, and API contracts.
+*   **Tool Recommendations**: Select the right tools for the job.
+    *   **Criteria**: Evaluate libraries based on bundle size, community support, and TS compatibility.
+    *   **Output**: `tech_stack.md` (or dedicated section in Design Doc) listing dependencies with justification.
+
+### 2.2 Design Architecture & File Standards
+| Plan Type | Standard Filename | Content Requirements |
+| :--- | :--- | :--- |
+| **System Design** | `system_design.md` | Architectural Blueprint (Component Hierarchy, State Flow). |
+| **Algorithm Specs** | `[name]_algo_spec.md` | Detailed logic & math. Must include Pseudocode, Big O analysis, and Edge Cases. |
+| **Tool Stack** | `tech_stack.md` | List of libraries/tools with justification (Bundle size, Support). |
+| **Coding Standards** | `coding_standards.md` | Language-specific rules (e.g., "React Hooks only", "No Any") and linter config. |
+| **UI Implementation** | `ui_design_plan.md` | Component breakdown, CSS Strategy (e.g. Tailwind), and Storybook setup. |
+| **API Design** | `api_spec.md` | Endpoints, Request/Response schemas, and Error handling (if applicable). |
+
+### 2.3 Architectural Rules
 1.  **Strict Separation of Concerns**:
-    -   **UI Layer** (`src/components/`, `src/pages/`) must strictly *render state* and dispatch *actions*. It must clear of simulation logic.
-    -   **Simulation Engine** (`src/simulation.ts`) must be a pure function or contained module that takes state + inputs and returns new state. No UI dependencies.
-    -   **Types** (`src/types.ts`) should be shared but minimal.
-    
+    *   **UI Layer** (`src/components/`, `src/pages/`): Strictly *renders state* and dispatches *actions*. No simulation logic.
+    *   **Simulation Engine** (`src/simulation.ts`): A pure function/module taking state + inputs -> new state. No UI dependencies.
+    *   **Types** (`src/types.ts`): Shared but minimal definitions.
 2.  **State Management**:
-    -   Use a single source of truth (likely a React Context or simple state object for this scale) passed down to components.
-    -   State updates must be immutable.
-
+    *   Single source of truth passed down to components.
+    *   State updates must be immutable.
 3.  **Tick-Based Simulation**:
-    -   All logic updates happen in a `tick()` function.
-    -   UI re-renders reacting to the state change produced by `tick()`.
-
-4.  **No "Magic Numbers"**:
-    -   Configuration (floors, speed, etc.) must be parameterized in a config object, not hardcoded.
-
-5.  **Workflow**:
-    -   **Plan First**: Before writing code, update the relevant specification file (`plan.md`, `ui_spec.md`, etc.).
-    -   **Review**: Wait for user approval on the plan.
-    -   **Implement**: Write code matching the plan.
-    -   **Verify**: Run relevant tests (`npx vitest`) **ONLY** after code changes. Do not run tests for documentation-only updates.
+    *   All logic updates occur in a central `tick()` function (O(N) or O(1) complexity).
+    *   UI re-renders purely as a reaction to the state change from `tick()`.
+4.  **Configuration**:
+    *   No "Magic Numbers". All parameters (floors, speeds) must be in a config object.
 
 ---
 
-## 3. Coding Guidelines (React + TypeScript)
+## Phase 3: Implementation (Development)
+**Goal**: Build the system according to the design specifications.
 
-### React
--   **Functional Components**: Use functional components with hooks. Avoid class components.
--   **Props Interface**: Always define a strict interface for component props.
-    ```typescript
-    interface MyComponentProps {
-      isActive: boolean;
-      onToggle: () => void;
-    }
-    ```
--   **Component Size Limit**: **No component file should exceed 150 lines**. This is a hard rule.
-    -   When approaching the limit, refactor into smaller components
-    -   Extract business logic into custom hooks
-    -   Move utility functions to separate modules
-    -   See `guides/coding_standards.md` for full details
--   **Component Architecture**:
-    -   **Single Responsibility**: Each component should do one thing well
-    -   **Composition over Complexity**: Build complex UIs from simple, reusable components
-    -   **Extract Early**: Don't wait until hitting 150 lines - extract at ~100 lines
-    -   **Examples from this project**:
-        - `BuildingView` → `FloorControls`, `ElevatorShaft`, `ElevatorCar`
-        - `SimulationPage` → `SimulationHeader`, `useSimulationControls`, `useCarPanel`
--   **Custom Hooks for Logic**:
-    -   Extract stateful logic into custom hooks (e.g., `useSimulationControls`, `useCarPanel`)
-    -   Hooks should manage related state and side effects
-    -   Makes business logic testable independent of UI
--   **Memoization**: Use `useMemo` for expensive calculations (like derived metrics) and `useCallback` for event handlers passed to children to avoid unnecessary re-renders.
--   **Styling**: Use standard CSS modules or styled-components (if configured). Keep styles co-located or modular. For this project, inline styles or simple CSS files are acceptable given the `ui_spec.md` emphasis on specific visual properties.
+### 3.1 Workflow
+1.  **Plan**: Update relevant specs (`plan.md`, `ui_spec.md`) before coding.
+2.  **Review**: Wait for user approval.
+3.  **Implement**: Write code matching the plan.
+4.  **Verify**: Run tests (`npx vitest`) **ONLY** after code changes.
 
-### TypeScript
--   **Strict Typing**: Avoid `any`. Use `unknown` if type is truly ambiguous, then narrow.
--   **Interfaces vs Types**: Prefer `interface` for public APIs/Props, `type` for unions/complex compositions.
--   **Null Safety**: Use optional chaining (`?.`) and nullish coalescing (`??`).
+### 3.2 Coding Guidelines (React + TypeScript)
+*   **Component Architecture**:
+    *   **Size Limit**: **Standard max 150 lines**. Extract at ~100 lines.
+    *   **Functional Components**: Use hooks only. No class components.
+    *   **Strict Props**: Define interfaces for all props (`interface MyComponentProps`).
+    *   **Composition**: Build complex UIs from simple atoms (e.g., `BuildingView` -> `ElevatorShaft` -> `ElevatorCar`).
+*   **Business Logic**:
+    *   Extract stateful logic into Custom Hooks (e.g., `useSimulationControls`).
+    *   Keep logic testable and independent of UI rendering.
+*   **TypeScript**:
+    *   **Strict Typing**: No `any`. Use `unknown` + narrowing if needed.
+    *   **Null Safety**: Use optional chaining (`?.`) and nullish coalescing (`??`).
+*   **Styling**:
+    *   Follow `ui_spec.md` strictly (Glassmorphism).
+    *   Inline styles or CSS modules are acceptable.
+*   **Accessibility**:
+    *   Semantic HTML (`<button>`, `<main>`).
+    *   `aria-label` for icon-only buttons.
 
 ---
 
-## 4. Best Practices
+## Phase 4: Testing & Verification
+**Goal**: Ensure the system works as expected and meets quality standards.
 
--   **Component Refactoring**:
-    -   **When to refactor**: Component exceeds 100 lines or has multiple responsibilities
-    -   **How to refactor**:
-        1. Identify logical sections (header, content, controls, etc.)
-        2. Extract one section at a time into a new component
-        3. Move business logic to custom hooks
-        4. Create utility modules for shared functions
-        5. Run tests after each extraction to ensure no regressions
-    -   **Refactoring checklist**:
-        - [ ] All tests still pass
-        - [ ] No duplicate code introduced
-        - [ ] Props interfaces are well-defined
-        - [ ] Component names are descriptive
-        - [ ] Documentation updated
--   **Testing**:
-    -   Write unit tests for *logic* (simulation engine) independent of UI.
-    -   Test edge cases (e.g., 0 floors, empty queues, simultaneous requests).
--   **Performance**:
-    -   The simulation loop can run frequently (e.g., 100ms). Specific care must be taken to ensure the `tick` logic is O(N) or O(1), not O(N^2) where N is requests/elevators.
--   **Accessibility (a11y)**:
-    -   Ensure buttons have `aria-label` if they are icon-only.
-    -   Use semantic HTML (`<button>`, `<main>`, `<header>`).
--   **Code Quality**:
-    -   Keep components small (Single Responsibility Principle) - **Maximum 150 lines**.
-    -   Comments should explain *why*, not *what*.
-    -   Follow the coding standards in `guides/coding_standards.md`.
+### 4.1 Testing Strategy
+*   **Unit Tests**: Verify `simulation.ts` logic against `test_plan.md` (Target: 100% Core Logic Coverage).
+*   **Component Tests**: Verify rendering and interaction using generic rules from `test_spec.md`.
+*   **Integration Tests**: Verify the full simulation loop in `App.tsx`.
+*   **Edge Cases**: Explicitly test 0 floors, empty queues, simultaneous requests.
+
+### 4.2 Verification Workflow
+*   Run `npm run test:coverage` to identify blind spots.
+*   Ensure test descriptions map back to Test Cases (e.g., "TC14: ...").
 
 ---
 
-## 5. Prompts & LLM Interactions (Internal Guide)
-*Use these guidelines when generating code or explanations.*
+## Phase 5: Deployment & Delivery
+**Goal**: Make the application available for use.
 
--   **When debugging**: Always ask for the reproduction steps or the specific log entry that indicates failure.
--   **When designing UI**: Refer strictly to the "Glassmorphism" rules in `ui_spec.md`.
--   **When creating/updating tests**: Ensure test descriptions map back to the Test Cases in `test_plan.md` (e.g., "TC14: ...").
+### 5.1 Artifact Generation
+*   **Build**: Use `vite build` to create optimized static assets.
+*   **Reports**: Generate HTML test reports (`test-report/index.html`) and coverage summaries.
+
+### 5.2 Delivery Checklist
+*   [ ] Application builds without errors.
+*   [ ] All tests pass.
+*   [ ] Linter (`eslint`) reports no warnings.
+*   [ ] Performance is acceptable (60fps animation).
+
+---
+
+## Phase 6: Maintenance & Evolution
+**Goal**: Keep the system healthy, clean, and adaptable to change.
+
+### 6.1 Refactoring Strategy
+*   **Trigger**: Component exceeds 100 lines or has mixed responsibilities.
+*   **Process**:
+    1.  Identify logical sections.
+    2.  Extract section to new component.
+    3.  Move logic to custom hooks.
+    4.  Verify with tests.
+*   **Checklist**:
+    *   [ ] No regressions (Tests pass).
+    *   [ ] No code duplication.
+    *   [ ] Clear naming and documentation.
+
+### 6.2 Prompts & LLM Interactions (Internal)
+*   **Debugging**: Ask for reproduction steps/logs.
+*   **UI Design**: Refer strictly to `ui_spec.md`.
+*   **Testing**: Map tests to `test_plan.md` IDs.
